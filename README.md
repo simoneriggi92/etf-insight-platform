@@ -1,7 +1,7 @@
 # etf-insight-platform
 
 ## Overview
-#This project borns with the objective to become an ETF/PAC portfolio, which is able to automatically retrieve, ingest and analyze the information/metadata about ETFs prices,transactions and perform the analysis of the PAC performance. 
+This project borns with the objective to become an ETF/PAC portfolio, which is able to automatically retrieve, ingest and analyze the information/metadata about ETFs prices,transactions and perform the analysis of the PAC performance. 
 
 ## Target user
 The target of the platform are the users that already have or are being creating a PAC and they want to analyze the performance and the details behind the shifts of the ETFs contained into. 

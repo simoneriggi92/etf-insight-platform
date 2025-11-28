@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: etf-insight-postgres
+    environment:
+      POSTGRES_USER: etfuser
+      POSTGRES_PASSWORD: etfpass
+      POSTGRES_DB: etf_insight
+    ports:
+      - "5433:5432"
+    volumes:
+      - ../db/init:/docker-entrypoint-initdb.d # It means that the host directory ../db/init is mounted to the container directory /docker-entrypoint-initdb.d
+      - etf_insight_pgdata:/var/lib/postgresql/data
+
+volumes:
+  etf_insight_pgdata:

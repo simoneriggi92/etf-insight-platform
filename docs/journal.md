@@ -18,3 +18,10 @@
 - Fixed appsettings.Development.json paths definition
 - Started ingestion worker and verified data-ingestion and idempotency
 - Created .gitignore file with standard patterns for .NET projects (build outputs, IDE files, OS-specified files and other common exclusions)
+
+## 2025-12-02 Day 4
+- Created minimal API project to expose ETF data and API status: 
+    - /etfs: exposes all etfs saved in the etfs table
+    - /etfs/{ticker}/prices?limit: exposes prices history saved in the etf_prices_history, ordered by desc, of the etf ticker passed as parameter 
+    - /health: returns the API status 
+- Updated schema-v0.sql adding the table's schemas: portfolio and portfolio_transaction. Added some data them manually.

@@ -112,6 +112,117 @@ app.MapGet("/etfs/{ticker}/prices", async(
     return Results.Ok(prices);
 });
 
+
+app.MapGet("/portfolios/{id:int}/valuation", async(
+    int id, 
+    DateTime? date,
+    IDbConnectionFactory dbConnectionFactory) =>
+{   
+    var asOfDate = date?.Date ?? DateTime.UtcNow.Date;
+
+    await using var conn = dbConnectionFactory.CreateConnection();
+    await conn.OpenAsync();
+
+    // 1. Check portfolio exists
+    var portfolioCmd = new NpgsqlCommand(
+        "select id, name from portfolio where id = @id",
+        (NpgsqlConnection)conn);
+
+    portfolioCmd.Parameters.AddWithValue("id", id);
+
+    var portfolioName = string.Empty;
+    await using (var portfolioReader = await portfolioCmd.ExecuteReaderAsync())
+    {
+        if(!await portfolioReader.ReadAsync())
+        {
+            return Results.NotFound(new { message = $"Portfolio with id '{id}' not found." });
+        }
+        portfolioName = portfolioReader.GetString(1);
+    }
+
+    // 2. Positions (quantity per ETF as of date)
+
+    var positionsSql = @"
+        with positions as (
+            select
+                pt.portfolio_id,
+                pt.etf_id,
+                sum(case 
+                        when pt.trade_type = 'BUY' then pt.quantity
+                        when pt.trade_type = 'SELL' then -pt.quantity
+                        else 0
+                    end) as quantity
+            from portfolio_transaction pt
+            where pt.portfolio_id = @portfolio_id
+            and pt.trade_date <= @as_of
+            group by pt.portfolio_id, pt.etf_id
+        ),
+        prices as (
+            select
+                eph.etf_id,
+                eph.price_date,
+                eph.close_price
+            from etf_price_history eph
+            where eph.price_date = @as_of
+        )
+        select
+            p.portfolio_id,
+            e.ticker,
+            p.quantity,
+            pr.close_price
+        from positions p
+        join etf e on e.id = p.etf_id
+        left join prices pr on pr.etf_id = p.etf_id
+        where p.quantity <> 0
+        order by e.ticker;
+    ";
+
+    var positionsCmd = new NpgsqlCommand(
+        positionsSql, 
+        (NpgsqlConnection)conn);
+
+    positionsCmd.Parameters.AddWithValue("portfolio_id", id);
+    positionsCmd.Parameters.AddWithValue("as_of", asOfDate);
+
+    await using var positionsReader = await positionsCmd.ExecuteReaderAsync();
+
+    var positions = new List<object>();
+    decimal totalValue = 0;
+
+    while(await positionsReader.ReadAsync())
+    {
+        var ticker = positionsReader.GetString(1);
+        var quantity = positionsReader.GetDecimal(2);
+        decimal? closePrice = positionsReader.IsDBNull(3) ? null : positionsReader.GetDecimal(3);
+        decimal? positionValue = null;
+
+        if(closePrice.HasValue)
+        {
+            positionValue = quantity * closePrice.Value;
+            totalValue += positionValue.Value;
+        }
+
+        positions.Add(new
+        {
+            Ticker = ticker,
+            Quantity = quantity,
+            ClosePrice = closePrice,
+            PositionValue = positionValue
+        });
+    }
+
+    var response = new
+    {
+        PortfolioId = id,
+        PortfolioName = portfolioName,
+        AsOfDate = asOfDate,
+        Positions = positions,
+        TotalValue = totalValue
+    };
+
+    return Results.Ok(response);
+});
+
 app.Run();
 
 public interface IDbConnectionFactory

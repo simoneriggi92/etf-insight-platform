@@ -25,3 +25,7 @@
     - /etfs/{ticker}/prices?limit: exposes prices history saved in the etf_prices_history, ordered by desc, of the etf ticker passed as parameter 
     - /health: returns the API status 
 - Updated schema-v0.sql adding the table's schemas: portfolio and portfolio_transaction. Added some data them manually.
+
+## 2025-12-03 Day 5
+- Created .sql script to compute the ETFs positions at a certain date
+- Create minimal API endpoint '/portfolios/{id:int}/valuation' which computes the totalValue of an ETF at a certain date

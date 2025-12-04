@@ -29,3 +29,9 @@
 ## 2025-12-03 Day 5
 - Created .sql script to compute the ETFs positions at a certain date
 - Create minimal API endpoint '/portfolios/{id:int}/valuation' which computes the totalValue of an ETF at a certain date
+
+## 2025-12-04 Day 6
+- Manually tested the valuation API with and without query string parameters and verified the results
+- Created valuation worker project and started implementing the logic to:
+    - automatically perform valuation for each existing portfolio.
+    - insert valuation to new 'portfolio_valuation' table.

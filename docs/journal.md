@@ -31,6 +31,7 @@
 - Create minimal API endpoint '/portfolios/{id:int}/valuation' which computes the totalValue of an ETF at a certain date
 
 ## 2025-12-04 Day 6
+- Created launch.json and tasks.json to run in Debug mode EtfInsight.Api project
 - Manually tested the valuation API with and without query string parameters and verified the results
 - Created valuation worker project and started implementing the logic to:
     - automatically perform valuation for each existing portfolio.

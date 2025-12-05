@@ -36,3 +36,8 @@
 - Created valuation worker project and started implementing the logic to:
     - automatically perform valuation for each existing portfolio.
     - insert valuation to new 'portfolio_valuation' table.
+
+## 2025-12-05 Day 5 
+- Debugged the EtfInsight.Portfolio.Valuation worker to fix the logic to compute the portfolio valuation
+- Changed launch.json and tasks.json to run EtfInsight.Portfolio.Valuation in Debug mode
+- Modified the 'portfolio_valuation' table schema in schema-v0.sql

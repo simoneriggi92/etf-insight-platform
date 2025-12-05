@@ -61,15 +61,15 @@ create index if not exists idx_portfolio_transaction_etf
 -- Portfolio Storicization Schema v0
 -- =========
 
-create table if not EXISTS portfolio_valuation
-(
-    id bigserial primary key,
-    portfolio_id integer not null references portfolio(id) on delete cascade,
-    valuation_date date not null,
-    total_value numeric(20,10) not null, -- in portfolio's base currency
-    created_at timestamp without time zone default now() not null,
-    CONSTRAINT uq_portfolio_valuation UNIQUE (portfolio_id, valuation_date) -- Unique constraint to avoid duplicate valuations for the same date
-)
+create table if not exists portfolio_valuation (
+    id              bigserial primary key,
+    portfolio_id    int not null references portfolio(id) on delete cascade,
+    valuation_date  date not null,
+    total_value     numeric(20,10) not null,
+    base_currency   varchar(10) not null,
+    created_at      timestamp without time zone not null default now(),
+    constraint uq_portfolio_valuation unique (portfolio_id, valuation_date)
+);
 
 create index if not exists idx_portfolio_valuation_portfolio_date
   on portfolio_valuation (portfolio_id, valuation_date);

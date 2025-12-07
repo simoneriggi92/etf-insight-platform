@@ -41,3 +41,8 @@
 - Debugged the EtfInsight.Portfolio.Valuation worker to fix the logic to compute the portfolio valuation
 - Changed launch.json and tasks.json to run EtfInsight.Portfolio.Valuation in Debug mode
 - Modified the 'portfolio_valuation' table schema in schema-v0.sql
+
+## 2025-12-07 Day 6
+- Debuggeds and fixed port EtfInsight.Portfolio.Valuation worker valuation computation.
+- Fixed saving portfolio evaluation to 'portfolio_valuation' table.
+- Compared results with the minimal API endpoint '/portfolios/{id:int}/valuation' and verified the correctness.

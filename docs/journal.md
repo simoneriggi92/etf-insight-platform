@@ -43,6 +43,10 @@
 - Modified the 'portfolio_valuation' table schema in schema-v0.sql
 
 ## 2025-12-07 Day 6
-- Debuggeds and fixed port EtfInsight.Portfolio.Valuation worker valuation computation.
+- Debugged and fixed port EtfInsight.Portfolio.Valuation worker valuation computation.
 - Fixed saving portfolio evaluation to 'portfolio_valuation' table.
 - Compared results with the minimal API endpoint '/portfolios/{id:int}/valuation' and verified the correctness.
+
+## 2025-12-08 Day 7
+- Refactored and improved the logic of EtfInsight.Portfolio.Valuation worker
+- Verified the correctness of the model computing new valuation based on the insert of new transactions

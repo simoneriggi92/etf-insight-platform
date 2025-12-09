@@ -50,3 +50,7 @@
 ## 2025-12-08 Day 7
 - Refactored and improved the logic of EtfInsight.Portfolio.Valuation worker
 - Verified the correctness of the model computing new valuation based on the insert of new transactions
+
+## 2025-12-09 Day 8
+- Implemented new API endpoint '/portfolios/{id:int}/valuation/history' to return portfolio valuations for a specific time range
+- Verified numbers and formatted response (response value types)

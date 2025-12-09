@@ -1,4 +1,5 @@
 using System.Data;
+using System.Globalization;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -112,7 +113,6 @@ app.MapGet("/etfs/{ticker}/prices", async(
     return Results.Ok(prices);
 });
 
-
 app.MapGet("/portfolios/{id:int}/valuation", async(
     int id, 
     DateTime? date,
@@ -218,6 +218,69 @@ app.MapGet("/portfolios/{id:int}/valuation", async(
         AsOfDate = asOfDate,
         Positions = positions,
         TotalValue = totalValue
+    };
+
+    return Results.Ok(response);
+});
+
+app.MapGet("/portfolios/{id:int}/valuation/history", async(
+    int id, 
+    DateTime? from,
+    DateTime? to,
+    IDbConnectionFactory dbConnectionFactory) =>
+{   
+    await using var conn = dbConnectionFactory.CreateConnection();
+    await conn.OpenAsync();
+
+    var sql = @"
+        select
+            pv.base_currency,
+            pv.valuation_date,
+            pv.total_value
+        from portfolio_valuation pv
+        where pv.portfolio_id = @portfolio_id
+        ";
+
+    if(from.HasValue)
+    {
+        sql += " and pv.valuation_date >= @fromDate ";
+    }
+    if(to.HasValue)
+    {
+        sql += " and pv.valuation_date <= @toDate ";
+    }
+
+    sql += " order by pv.valuation_date asc";
+
+    var cmd = new NpgsqlCommand(sql, (NpgsqlConnection)conn);
+    cmd.Parameters.AddWithValue("portfolio_id", id);
+    if(from.HasValue) cmd.Parameters.AddWithValue("fromDate", from.Value);
+    if(to.HasValue) cmd.Parameters.AddWithValue("toDate", to.Value);
+
+    await using var reader = await cmd.ExecuteReaderAsync();
+
+    var valuations = new List<object>();
+    var baseCurrency = string.Empty;
+
+    while(await reader.ReadAsync())
+    {
+        if (string.IsNullOrEmpty(baseCurrency) && !reader.IsDBNull(0))
+        {
+            baseCurrency = reader.GetString(0);
+        }
+
+        valuations.Add(new
+        {
+            Date = DateOnly.FromDateTime(reader.GetDateTime(1)),
+            TotalValue = Math.Round(reader.GetDecimal(2), 2)
+        });
+    }
+
+    var response = new
+    {
+        PortfolioId = id,
+        BaseCurrency = string.IsNullOrEmpty(baseCurrency) ? null : baseCurrency,
+        Points = valuations
     };
 
     return Results.Ok(response);

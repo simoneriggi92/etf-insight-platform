@@ -54,3 +54,12 @@
 ## 2025-12-09 Day 8
 - Implemented new API endpoint '/portfolios/{id:int}/valuation/history' to return portfolio valuations for a specific time range
 - Verified numbers and formatted response (response value types)
+
+## 2025-12-10 Day 9
+- Improved API endpoint '/portfolios/{id:int}/valuation/history' integrating the logics to compute the following metrics: 
+    - absoluteChange
+    - percentChange
+    - netFlow
+    - cumulativeNetFlow
+    - pnL
+    - return

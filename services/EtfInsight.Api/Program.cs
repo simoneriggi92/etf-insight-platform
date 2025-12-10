@@ -232,6 +232,50 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
     await using var conn = dbConnectionFactory.CreateConnection();
     await conn.OpenAsync();
 
+    var transactionsSql = @"
+        select pt.trade_date,
+            sum(case 
+                    when pt.trade_type = 'BUY' then +pt.total_amount
+                    when pt.trade_type = 'SELL'then -pt.total_amount
+                    else 0 
+                        end) as netFlow
+        from portfolio_transaction pt
+        where pt.portfolio_id = @portfolio_id
+        ";
+
+    if(from.HasValue)
+    {
+        transactionsSql += " and pt.trade_date >= @fromDate ";
+    }
+    if(to.HasValue)
+    {
+        transactionsSql += " and pt.trade_date <= @toDate ";
+    }
+
+    transactionsSql += @"
+        group by pt.trade_date
+        order by pt.trade_date asc
+    ";
+
+
+      // Read and save the net flow per date
+    await using var transactionsCmd = new NpgsqlCommand(transactionsSql, (NpgsqlConnection)conn);
+    
+    transactionsCmd.Parameters.AddWithValue("portfolio_id", id);
+    if(from.HasValue) transactionsCmd.Parameters.AddWithValue("fromDate", from.Value);
+    if(to.HasValue) transactionsCmd.Parameters.AddWithValue("toDate", to.Value);
+
+    var transactions = new Dictionary<DateTime, decimal>();
+    await using (var transactionsReader = await transactionsCmd.ExecuteReaderAsync())
+    {
+        while (await transactionsReader.ReadAsync())
+        {
+            var tradeDate = transactionsReader.GetDateTime(0).Date;
+            var netFlowAmount = transactionsReader.GetDecimal(1);
+            transactions[tradeDate] = netFlowAmount;
+        }
+    }
+
     var sql = @"
         select
             pv.base_currency,
@@ -262,6 +306,14 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
     var valuations = new List<object>();
     var baseCurrency = string.Empty;
 
+    var previousValue = 0m;
+    var percentChange = 0m;
+    var absoluteChange = 0m;
+    var netFlow = 0m; // Σ total_amount (BUY) − Σ total_amount (SELL)
+    var cumulativeNetFlow = 0m; // invested net worth =  cumulativeFlow(D) = Σ netFlow(t) fino a D
+    var pnL = 0m; // profit/loss market-to-market = totalValue(D) - cumulativeNetFlow(D)
+    var performaceComparedToPaidInCapital = 0m; // performance compared to paid-in capital = pnL(D) / cumulativeNetFlow(D)
+
     while(await reader.ReadAsync())
     {
         if (string.IsNullOrEmpty(baseCurrency) && !reader.IsDBNull(0))
@@ -269,11 +321,31 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
             baseCurrency = reader.GetString(0);
         }
 
+        // Calculate changes
+
+        var currentValue = reader.GetDecimal(2);
+        absoluteChange = previousValue != 0 ? currentValue - previousValue : 0;
+
+        // percentChange(D) = (Value(D) - Value(D-1)) / Value(D-1)
+        percentChange = previousValue != 0 ? (absoluteChange / previousValue) : 0; // daily change of total value (flows + market), not performance over time
+        netFlow = transactions.TryGetValue(reader.GetDateTime(1).Date, out var flow) ? flow : 0;
+        cumulativeNetFlow += netFlow;
+        pnL = currentValue - cumulativeNetFlow;
+        performaceComparedToPaidInCapital = cumulativeNetFlow != 0 ? (pnL / cumulativeNetFlow) : 0;
+
         valuations.Add(new
         {
             Date = DateOnly.FromDateTime(reader.GetDateTime(1)),
-            TotalValue = Math.Round(reader.GetDecimal(2), 2)
+            TotalValue = Math.Round(reader.GetDecimal(2), 2),
+            AbsoluteChange = Math.Round(absoluteChange, 2),
+            PercentChange = Math.Round(percentChange, 3),
+            NetFlow = Math.Round(netFlow, 2),
+            CumulativeNetFlow = Math.Round(cumulativeNetFlow, 2),
+            PnL = Math.Round(pnL, 2),
+            Return = Math.Round(performaceComparedToPaidInCapital, 3)
         });
+        
+        previousValue = currentValue;
     }
 
     var response = new

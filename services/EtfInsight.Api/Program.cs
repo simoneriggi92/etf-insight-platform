@@ -232,6 +232,28 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
     await using var conn = dbConnectionFactory.CreateConnection();
     await conn.OpenAsync();
 
+    var maxEvaluationDateSql = @"
+        select max(pv.valuation_date)
+        from portfolio_valuation pv
+        where pv.portfolio_id = @portfolio_id
+    ";
+
+    await using var maxEvalCmd = new NpgsqlCommand(maxEvaluationDateSql, (NpgsqlConnection)conn);
+    maxEvalCmd.Parameters.AddWithValue("portfolio_id", id);
+    var maxEvalDateObj = await maxEvalCmd.ExecuteScalarAsync();
+
+    if ((maxEvalDateObj == null || maxEvalDateObj == DBNull.Value) && !to.HasValue)
+    {
+        // No valuations found for the portfolio
+        return Results.Ok(new
+        {
+            PortfolioId = id,
+            BaseCurrency = (string?)null,
+            Points = new List<object>()
+        });
+    }
+
+    // Get all transactions from the beginning up to 'to' date to calculate net flows
     var transactionsSql = @"
         select pt.trade_date,
             sum(case 
@@ -241,29 +263,27 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
                         end) as netFlow
         from portfolio_transaction pt
         where pt.portfolio_id = @portfolio_id
-        ";
-
-    if(from.HasValue)
-    {
-        transactionsSql += " and pt.trade_date >= @fromDate ";
-    }
-    if(to.HasValue)
-    {
-        transactionsSql += " and pt.trade_date <= @toDate ";
-    }
-
-    transactionsSql += @"
+            and pt.trade_date <= @maxValuationDate
         group by pt.trade_date
         order by pt.trade_date asc
-    ";
-
+        ";
 
       // Read and save the net flow per date
     await using var transactionsCmd = new NpgsqlCommand(transactionsSql, (NpgsqlConnection)conn);
     
-    transactionsCmd.Parameters.AddWithValue("portfolio_id", id);
-    if(from.HasValue) transactionsCmd.Parameters.AddWithValue("fromDate", from.Value);
-    if(to.HasValue) transactionsCmd.Parameters.AddWithValue("toDate", to.Value);
+    var maxEvalDate = maxEvalDateObj switch
+    {
+        null or DBNull => DateTime.MaxValue,
+        DateTime dt => dt,
+        DateOnly dateOnly => dateOnly.ToDateTime(TimeOnly.MinValue),
+        _ => DateTime.MaxValue
+    };
+    
+    var maxDate = to.HasValue && to.Value < maxEvalDate 
+        ? to.Value 
+        : maxEvalDate;
+    
+    transactionsCmd.Parameters.AddWithValue("maxValuationDate", maxDate);
 
     var transactions = new Dictionary<DateTime, decimal>();
     await using (var transactionsReader = await transactionsCmd.ExecuteReaderAsync())
@@ -275,6 +295,10 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
             transactions[tradeDate] = netFlowAmount;
         }
     }
+
+    var orderedFlows = transactions
+    .OrderBy(kv => kv.Key)
+    .ToList();
 
     var sql = @"
         select
@@ -309,11 +333,11 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
     var previousValue = 0m;
     var percentChange = 0m;
     var absoluteChange = 0m;
-    var netFlow = 0m; // Σ total_amount (BUY) − Σ total_amount (SELL)
     var cumulativeNetFlow = 0m; // invested net worth =  cumulativeFlow(D) = Σ netFlow(t) fino a D
     var pnL = 0m; // profit/loss market-to-market = totalValue(D) - cumulativeNetFlow(D)
-    var performaceComparedToPaidInCapital = 0m; // performance compared to paid-in capital = pnL(D) / cumulativeNetFlow(D)
+    var performance= 0m; // performance compared to paid-in capital = pnL(D) / cumulativeNetFlow(D)
 
+    var flowIndex = 0;
     while(await reader.ReadAsync())
     {
         if (string.IsNullOrEmpty(baseCurrency) && !reader.IsDBNull(0))
@@ -321,17 +345,35 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
             baseCurrency = reader.GetString(0);
         }
 
-        // Calculate changes
-
+        // Calculate metrics
+        var valuationDate = reader.GetDateTime(1).Date;
         var currentValue = reader.GetDecimal(2);
-        absoluteChange = previousValue != 0 ? currentValue - previousValue : 0;
 
+        // Update cumulative net flow up to and including valuationDate
+        var netFlowToday = 0m;  // Σ total_amount (BUY) − Σ total_amount (SELL)
+
+        while(flowIndex < orderedFlows.Count && orderedFlows[flowIndex].Key <= valuationDate)
+        {
+            var flowDate = orderedFlows[flowIndex].Key;
+            var flowAmount = orderedFlows[flowIndex].Value;
+
+            cumulativeNetFlow += flowAmount;
+            
+            if(flowDate == valuationDate)
+            {
+                netFlowToday += flowAmount;
+            }
+
+            flowIndex++;
+        }
+
+        absoluteChange = previousValue != 0 ? currentValue - previousValue : 0;
         // percentChange(D) = (Value(D) - Value(D-1)) / Value(D-1)
         percentChange = previousValue != 0 ? (absoluteChange / previousValue) : 0; // daily change of total value (flows + market), not performance over time
-        netFlow = transactions.TryGetValue(reader.GetDateTime(1).Date, out var flow) ? flow : 0;
-        cumulativeNetFlow += netFlow;
+
+        // netFlow = transactions.TryGetValue(reader.GetDateTime(1).Date, out var flow) ? flow : 0;
         pnL = currentValue - cumulativeNetFlow;
-        performaceComparedToPaidInCapital = cumulativeNetFlow != 0 ? (pnL / cumulativeNetFlow) : 0;
+        performance= cumulativeNetFlow != 0 ? (pnL / cumulativeNetFlow) : 0;
 
         valuations.Add(new
         {
@@ -339,10 +381,10 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
             TotalValue = Math.Round(reader.GetDecimal(2), 2),
             AbsoluteChange = Math.Round(absoluteChange, 2),
             PercentChange = Math.Round(percentChange, 3),
-            NetFlow = Math.Round(netFlow, 2),
+            NetFlow = Math.Round(netFlowToday, 2),
             CumulativeNetFlow = Math.Round(cumulativeNetFlow, 2),
             PnL = Math.Round(pnL, 2),
-            Return = Math.Round(performaceComparedToPaidInCapital, 3)
+            Return = Math.Round(performance, 3)
         });
         
         previousValue = currentValue;

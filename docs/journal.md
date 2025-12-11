@@ -63,3 +63,9 @@
     - cumulativeNetFlow
     - pnL
     - return
+
+## 2025-12-11 Day 10
+- Fixed API endpoint '/portfolios/{id:int}/valuation/history', in particular:
+    - how 'cumulativeNetFlow' was computed: the issue was due the computation was not considering all the portfolio transactions from the beginning up to 'toDate' valuation date
+    - The transactions loaded was considering the filter 'from-to' timerange, rather than load all portofolio's transaction from the beginning up to valuation date
+    - Using portfolio max(valution_date) as fallback whenever 'toDate' parameter is not valued

@@ -9,7 +9,7 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
 
-var connectionString = builder.Configuration.GetConnectionString("Postgres") 
+var connectionString = builder.Configuration.GetConnectionString("Postgres")
     ?? throw new InvalidOperationException("Postgres connection string is not configured.");
 
 builder.Services.AddSingleton<IDbConnectionFactory>(_ =>
@@ -21,8 +21,8 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 app.MapGet("/etfs", async (IDbConnectionFactory dbConnectionFactory) =>
 {
-   await using var conn = dbConnectionFactory.CreateConnection();
-   await conn.OpenAsync();
+    await using var conn = dbConnectionFactory.CreateConnection();
+    await conn.OpenAsync();
 
 
     var cmd = new NpgsqlCommand("select id, ticker, name, currency, provider from etf order by ticker", (NpgsqlConnection)conn);
@@ -45,7 +45,7 @@ app.MapGet("/etfs", async (IDbConnectionFactory dbConnectionFactory) =>
 });
 
 
-app.MapGet("/etfs/{ticker}/prices", async(
+app.MapGet("/etfs/{ticker}/prices", async (
     string ticker,
     int? limit,
     DateTime? from,
@@ -73,51 +73,51 @@ app.MapGet("/etfs/{ticker}/prices", async(
         where etf_id = @etfId
         ";
 
-        if(from.HasValue)
+    if (from.HasValue)
+    {
+        sql += " and price_date >= @fromDate ";
+    }
+    if (to.HasValue)
+    {
+        sql += " and price_date <= @toDate ";
+    }
+
+    sql += " order by price_date desc ";
+
+    if (limit.HasValue && limit.Value > 0)
+    {
+        sql += " limit @limit ";
+    }
+
+    var cmd = new NpgsqlCommand(sql, (NpgsqlConnection)conn);
+    cmd.Parameters.AddWithValue("etfId", etfId);
+    if (from.HasValue) cmd.Parameters.AddWithValue("fromDate", from.Value);
+    if (to.HasValue) cmd.Parameters.AddWithValue("toDate", to.Value);
+    if (limit.HasValue && limit.Value > 0) cmd.Parameters.AddWithValue("limit", limit.Value);
+
+    await using var reader = await cmd.ExecuteReaderAsync();
+
+    var prices = new List<object>();
+    while (await reader.ReadAsync())
+    {
+        prices.Add(new
         {
-            sql += " and price_date >= @fromDate ";
-        }
-        if(to.HasValue)
-        {
-            sql += " and price_date <= @toDate ";
-        }
-
-        sql += " order by price_date desc ";
-
-        if(limit.HasValue && limit.Value > 0)
-        {
-            sql += " limit @limit ";
-        }
-
-        var cmd = new NpgsqlCommand(sql, (NpgsqlConnection)conn);
-        cmd.Parameters.AddWithValue("etfId", etfId);
-        if(from.HasValue) cmd.Parameters.AddWithValue("fromDate", from.Value);
-        if(to.HasValue) cmd.Parameters.AddWithValue("toDate", to.Value);
-        if(limit.HasValue && limit.Value > 0) cmd.Parameters.AddWithValue("limit", limit.Value);
-
-        await using var reader = await cmd.ExecuteReaderAsync();
-
-        var prices = new List<object>();
-        while (await reader.ReadAsync())
-        {
-            prices.Add(new
-            {
-                PriceDate = reader.GetDateTime(0),
-                OpenPrice = reader.GetDecimal(1),
-                HighPrice = reader.GetDecimal(2),
-                LowPrice = reader.GetDecimal(3),
-                ClosePrice = reader.GetDecimal(4),
-                Volume = reader.IsDBNull(5) ? (long?)null : reader.GetInt64(5)
-            });
-        }
+            PriceDate = reader.GetDateTime(0),
+            OpenPrice = reader.GetDecimal(1),
+            HighPrice = reader.GetDecimal(2),
+            LowPrice = reader.GetDecimal(3),
+            ClosePrice = reader.GetDecimal(4),
+            Volume = reader.IsDBNull(5) ? (long?)null : reader.GetInt64(5)
+        });
+    }
     return Results.Ok(prices);
 });
 
-app.MapGet("/portfolios/{id:int}/valuation", async(
-    int id, 
+app.MapGet("/portfolios/{id:int}/valuation", async (
+    int id,
     DateTime? date,
     IDbConnectionFactory dbConnectionFactory) =>
-{   
+{
     var asOfDate = date?.Date ?? DateTime.UtcNow.Date;
 
     await using var conn = dbConnectionFactory.CreateConnection();
@@ -133,7 +133,7 @@ app.MapGet("/portfolios/{id:int}/valuation", async(
     var portfolioName = string.Empty;
     await using (var portfolioReader = await portfolioCmd.ExecuteReaderAsync())
     {
-        if(!await portfolioReader.ReadAsync())
+        if (!await portfolioReader.ReadAsync())
         {
             return Results.NotFound(new { message = $"Portfolio with id '{id}' not found." });
         }
@@ -178,7 +178,7 @@ app.MapGet("/portfolios/{id:int}/valuation", async(
     ";
 
     var positionsCmd = new NpgsqlCommand(
-        positionsSql, 
+        positionsSql,
         (NpgsqlConnection)conn);
 
     positionsCmd.Parameters.AddWithValue("portfolio_id", id);
@@ -189,14 +189,14 @@ app.MapGet("/portfolios/{id:int}/valuation", async(
     var positions = new List<object>();
     decimal totalValue = 0;
 
-    while(await positionsReader.ReadAsync())
+    while (await positionsReader.ReadAsync())
     {
         var ticker = positionsReader.GetString(1);
         var quantity = positionsReader.GetDecimal(2);
         decimal? closePrice = positionsReader.IsDBNull(3) ? null : positionsReader.GetDecimal(3);
         decimal? positionValue = null;
 
-        if(closePrice.HasValue)
+        if (closePrice.HasValue)
         {
             positionValue = quantity * closePrice.Value;
             totalValue += positionValue.Value;
@@ -223,35 +223,121 @@ app.MapGet("/portfolios/{id:int}/valuation", async(
     return Results.Ok(response);
 });
 
-app.MapGet("/portfolios/{id:int}/valuation/history", async(
-    int id, 
+app.MapGet("/portfolios/{id:int}/valuation/history", async (
+    int id,
     DateTime? from,
     DateTime? to,
     IDbConnectionFactory dbConnectionFactory) =>
-{   
+{
+
+    try
+    {
+        (string? baseCurrency, List<ValuationPoint> valuations) = await LoadValuationHistoryAsync(id, from, to, dbConnectionFactory);
+
+        var response = new
+        {
+            PortfolioId = id,
+            BaseCurrency = string.IsNullOrEmpty(baseCurrency) ? null : baseCurrency,
+            Points = valuations
+        };
+
+        return Results.Ok(response);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { Error = ex.Message });
+    }
+});
+
+app.MapGet("/portfolios/{id:int}/valuation/summary", async (
+    int id,
+    DateTime? from,
+    DateTime? to,
+    IDbConnectionFactory dbConnectionFactory) =>
+{
+    try
+    {
+        (string? baseCurrency, List<ValuationPoint> points) = await LoadValuationHistoryAsync(id, from, to, dbConnectionFactory);
+
+        if (points.Count == 0)
+        {
+            return Results.NotFound(new
+            {
+                PortfolioId = id,
+                BaseCurrency = baseCurrency,
+                HasData = false
+            });
+        }
+
+        var firstPoint = points.First();
+        var lastPoint = points.Last();
+
+        var startValue = firstPoint.TotalValue;
+        var endValue = lastPoint.TotalValue;
+        var netContributions = lastPoint.CumulativeNetFlow;
+        var pnL = lastPoint.PnL;
+        var totalReturn = lastPoint.Return;
+        var bestDayChange = points.Max(p => p.PercentChange);
+        var worstDayChange = points.Min(p => p.PercentChange);
+        var days = points.Count;
+
+        return Results.Ok(new
+        {
+            PortfolioId = id,
+            BaseCurrency = baseCurrency,
+            HasData = true,
+            StartValue = startValue,
+            EndValue = endValue,
+            NetContributions = netContributions,
+            PnL = pnL,
+            TotalReturn = totalReturn,
+            BestDayChange = bestDayChange,
+            WorstDayChange = worstDayChange,
+            Days = days
+        });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { Error = ex.Message });
+    }
+});
+
+app.Run();
+
+static async Task<(string? BaseCurrency, List<ValuationPoint> Points)> LoadValuationHistoryAsync(
+    int portfolioId, DateTime? from, DateTime? to, IDbConnectionFactory dbConnectionFactory)
+{
     await using var conn = dbConnectionFactory.CreateConnection();
     await conn.OpenAsync();
 
+    // Check if the portfolio exists
+    var portfolioExistsCmd = new NpgsqlCommand(
+        "select 1 from portfolio where id = @id",
+        (NpgsqlConnection)conn);
+
+    portfolioExistsCmd.Parameters.AddWithValue("id", portfolioId);
+    var exists = await portfolioExistsCmd.ExecuteScalarAsync();
+    if (exists == null)
+    {
+        throw new InvalidOperationException($"Portfolio with id '{portfolioId}' does not exist.");
+    }
+
     var maxEvaluationDateSql = @"
-        select max(pv.valuation_date)
-        from portfolio_valuation pv
-        where pv.portfolio_id = @portfolio_id
+    select max(pv.valuation_date)
+    from portfolio_valuation pv
+    where pv.portfolio_id = @portfolio_id
     ";
 
     await using var maxEvalCmd = new NpgsqlCommand(maxEvaluationDateSql, (NpgsqlConnection)conn);
-    maxEvalCmd.Parameters.AddWithValue("portfolio_id", id);
+    maxEvalCmd.Parameters.AddWithValue("portfolio_id", portfolioId);
     var maxEvalDateObj = await maxEvalCmd.ExecuteScalarAsync();
 
     if ((maxEvalDateObj == null || maxEvalDateObj == DBNull.Value) && !to.HasValue)
     {
         // No valuations found for the portfolio
-        return Results.Ok(new
-        {
-            PortfolioId = id,
-            BaseCurrency = (string?)null,
-            Points = new List<object>()
-        });
+        return (null, new List<ValuationPoint>());
     }
+
 
     // Get all transactions from the beginning up to 'to' date to calculate net flows
     var transactionsSql = @"
@@ -268,9 +354,9 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
         order by pt.trade_date asc
         ";
 
-      // Read and save the net flow per date
+    // Read and save the net flow per date
     await using var transactionsCmd = new NpgsqlCommand(transactionsSql, (NpgsqlConnection)conn);
-    
+
     var maxEvalDate = maxEvalDateObj switch
     {
         null or DBNull => DateTime.MaxValue,
@@ -278,11 +364,11 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
         DateOnly dateOnly => dateOnly.ToDateTime(TimeOnly.MinValue),
         _ => DateTime.MaxValue
     };
-    
-    var maxDate = to.HasValue && to.Value < maxEvalDate 
-        ? to.Value 
+
+    var maxDate = to.HasValue && to.Value < maxEvalDate
+        ? to.Value
         : maxEvalDate;
-    
+
     transactionsCmd.Parameters.AddWithValue("maxValuationDate", maxDate);
 
     var transactions = new Dictionary<DateTime, decimal>();
@@ -309,11 +395,11 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
         where pv.portfolio_id = @portfolio_id
         ";
 
-    if(from.HasValue)
+    if (from.HasValue)
     {
         sql += " and pv.valuation_date >= @fromDate ";
     }
-    if(to.HasValue)
+    if (to.HasValue)
     {
         sql += " and pv.valuation_date <= @toDate ";
     }
@@ -321,13 +407,13 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
     sql += " order by pv.valuation_date asc";
 
     var cmd = new NpgsqlCommand(sql, (NpgsqlConnection)conn);
-    cmd.Parameters.AddWithValue("portfolio_id", id);
-    if(from.HasValue) cmd.Parameters.AddWithValue("fromDate", from.Value);
-    if(to.HasValue) cmd.Parameters.AddWithValue("toDate", to.Value);
+    cmd.Parameters.AddWithValue("portfolio_id", portfolioId);
+    if (from.HasValue) cmd.Parameters.AddWithValue("fromDate", from.Value);
+    if (to.HasValue) cmd.Parameters.AddWithValue("toDate", to.Value);
 
     await using var reader = await cmd.ExecuteReaderAsync();
 
-    var valuations = new List<object>();
+    var points = new List<ValuationPoint>();
     var baseCurrency = string.Empty;
 
     var previousValue = 0m;
@@ -335,10 +421,10 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
     var absoluteChange = 0m;
     var cumulativeNetFlow = 0m; // invested net worth =  cumulativeFlow(D) = Σ netFlow(t) fino a D
     var pnL = 0m; // profit/loss market-to-market = totalValue(D) - cumulativeNetFlow(D)
-    var performance= 0m; // performance compared to paid-in capital = pnL(D) / cumulativeNetFlow(D)
+    var performance = 0m; // performance compared to paid-in capital = pnL(D) / cumulativeNetFlow(D)
 
     var flowIndex = 0;
-    while(await reader.ReadAsync())
+    while (await reader.ReadAsync())
     {
         if (string.IsNullOrEmpty(baseCurrency) && !reader.IsDBNull(0))
         {
@@ -352,14 +438,14 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
         // Update cumulative net flow up to and including valuationDate
         var netFlowToday = 0m;  // Σ total_amount (BUY) − Σ total_amount (SELL)
 
-        while(flowIndex < orderedFlows.Count && orderedFlows[flowIndex].Key <= valuationDate)
+        while (flowIndex < orderedFlows.Count && orderedFlows[flowIndex].Key <= valuationDate)
         {
             var flowDate = orderedFlows[flowIndex].Key;
             var flowAmount = orderedFlows[flowIndex].Value;
 
             cumulativeNetFlow += flowAmount;
-            
-            if(flowDate == valuationDate)
+
+            if (flowDate == valuationDate)
             {
                 netFlowToday += flowAmount;
             }
@@ -373,34 +459,33 @@ app.MapGet("/portfolios/{id:int}/valuation/history", async(
 
         // netFlow = transactions.TryGetValue(reader.GetDateTime(1).Date, out var flow) ? flow : 0;
         pnL = currentValue - cumulativeNetFlow;
-        performance= cumulativeNetFlow != 0 ? (pnL / cumulativeNetFlow) : 0;
+        performance = cumulativeNetFlow != 0 ? (pnL / cumulativeNetFlow) : 0;
 
-        valuations.Add(new
-        {
-            Date = DateOnly.FromDateTime(reader.GetDateTime(1)),
-            TotalValue = Math.Round(reader.GetDecimal(2), 2),
-            AbsoluteChange = Math.Round(absoluteChange, 2),
-            PercentChange = Math.Round(percentChange, 3),
-            NetFlow = Math.Round(netFlowToday, 2),
-            CumulativeNetFlow = Math.Round(cumulativeNetFlow, 2),
-            PnL = Math.Round(pnL, 2),
-            Return = Math.Round(performance, 3)
-        });
-        
+        points.Add(new ValuationPoint(
+            DateOnly.FromDateTime(reader.GetDateTime(1)),
+            Math.Round(reader.GetDecimal(2), 2),
+            Math.Round(absoluteChange, 2),
+            Math.Round(percentChange, 3),
+            Math.Round(netFlowToday, 2),
+            Math.Round(cumulativeNetFlow, 2),
+            Math.Round(pnL, 2),
+            Math.Round(performance, 3)
+        ));
+
         previousValue = currentValue;
     }
+    return (baseCurrency, points);
+}
 
-    var response = new
-    {
-        PortfolioId = id,
-        BaseCurrency = string.IsNullOrEmpty(baseCurrency) ? null : baseCurrency,
-        Points = valuations
-    };
-
-    return Results.Ok(response);
-});
-
-app.Run();
+public record ValuationPoint(
+    DateOnly Date,
+    decimal TotalValue,
+    decimal AbsoluteChange,
+    decimal PercentChange,
+    decimal NetFlow,
+    decimal CumulativeNetFlow,
+    decimal PnL,
+    decimal Return);
 
 public interface IDbConnectionFactory
 {

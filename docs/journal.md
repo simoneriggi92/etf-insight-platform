@@ -86,3 +86,5 @@
 
 - Implemented '/portfolios/{id:int}/valuation/summary' to return an aggregated view of a portfolio performance within a certain period
 - Extracted portfolio's points generation logic to a dedicated method to make it re-usable
+- Added dradown metric computation logic
+- Created model validation file to show the formulas used for the metrics computation

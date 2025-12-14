@@ -281,6 +281,39 @@ app.MapGet("/portfolios/{id:int}/valuation/summary", async (
         var worstDayChange = points.Min(p => p.PercentChange);
         var days = points.Count;
 
+        var maxValue = points.Max(p => p.TotalValue);
+        var minValue = points.Min(p => p.TotalValue);
+
+        // Calculate drawdowns
+        var maxDrawdown = 0m;
+        var maxDDStart = firstPoint.Date;
+        var maxDDEnd = firstPoint.Date;
+        var peak = firstPoint.TotalValue;
+        var peakDate = firstPoint.Date;
+
+        foreach (var point in points)
+        {
+            if (point.TotalValue > peak)
+            {
+                peak = point.TotalValue;
+                peakDate = point.Date;
+            }
+
+            if (peak <= 0)
+            {
+                continue;
+            }
+
+            var drawdown = (point.TotalValue - peak) / peak; // <= 0
+
+            if (drawdown < maxDrawdown)
+            {
+                maxDrawdown = drawdown;
+                maxDDStart = peakDate;
+                maxDDEnd = point.Date;
+            }
+        }
+
         return Results.Ok(new
         {
             PortfolioId = id,
@@ -293,6 +326,11 @@ app.MapGet("/portfolios/{id:int}/valuation/summary", async (
             TotalReturn = totalReturn,
             BestDayChange = bestDayChange,
             WorstDayChange = worstDayChange,
+            MaxValue = maxValue,
+            MinValue = minValue,
+            MaxDrawdown = Math.Round(maxDrawdown, 3),
+            MaxDrawdownStart = maxDDStart,
+            MaxDrawdownEnd = maxDDEnd,
             Days = days
         });
     }

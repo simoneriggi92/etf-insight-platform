@@ -88,3 +88,8 @@
 - Extracted portfolio's points generation logic to a dedicated method to make it re-usable
 - Added dradown metric computation logic
 - Created model validation file to show the formulas used for the metrics computation
+
+## 2025-12-15 Day 12
+
+- Added numeric example into 'valuation-model.md' to validate the model and provide a concrete example
+- Created 'EtfInsight.Tests' project to create UnitTests for the platform

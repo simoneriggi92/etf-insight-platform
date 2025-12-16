@@ -93,3 +93,10 @@
 
 - Added numeric example into 'valuation-model.md' to validate the model and provide a concrete example
 - Created 'EtfInsight.Tests' project to create UnitTests for the platform
+
+## 2025-12-16 Day 13
+
+- Moved valuation and summary computation logic to 'ValuationSummaryCalculator' static class to make their related UnitTests more clear
+- Created UnitTest based on container and clean PostgreSql image to test valuation computation logic:
+  - Implemented 'PostgresFixture' class to handle contrainer lifecycle: initialize and dispose PostgresSql container
+  - Implemented 'ValuationHistoryDbTests' unitTest to test valuation logic computation

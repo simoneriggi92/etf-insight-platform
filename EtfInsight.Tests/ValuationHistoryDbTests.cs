@@ -273,6 +273,86 @@ namespace EtfInsight.Tests
             points[2].Return.Should().Be(0.133m);
         }
 
+        [Fact]
+        public async Task LoadValuationHistoryAsync_WhenTransactionDayHasNoValuation_CarriesFlowToNextValuation_AndNetFlowTodayIsZero()
+        {
+            await using (var conn = new NpgsqlConnection(_fixture.ConnectionString))
+            {
+                await conn.OpenAsync();
+
+                await Exec(conn, @"drop table if exists portfolio_transaction;
+                           drop table if exists portfolio_valuation;
+                           drop table if exists portfolio;");
+
+                await Exec(conn, @"create table portfolio(
+                            id int primary key,
+                            name text not null
+                          );");
+
+                await Exec(conn, @"create table portfolio_transaction(
+                            portfolio_id int not null,
+                            trade_date timestamp without time zone not null,
+                            trade_type text not null,
+                            total_amount numeric not null
+                          );");
+
+                await Exec(conn, @"create table portfolio_valuation(
+                            portfolio_id int not null,
+                            base_currency text,
+                            valuation_date timestamp without time zone not null,
+                            total_value numeric not null
+                          );");
+
+                await Exec(conn, "insert into portfolio(id,name) values (1,'Test');");
+
+                // BUY day 20: +1000
+                await Exec(conn, @"insert into portfolio_transaction(portfolio_id, trade_date, trade_type, total_amount)
+                           values (1, '2025-11-20 00:00:00', 'BUY', 1000);");
+
+                // BUY day 21: +500 (NOTE: there will be NO valuation row for 2025-11-21)
+                await Exec(conn, @"insert into portfolio_transaction(portfolio_id, trade_date, trade_type, total_amount)
+                           values (1, '2025-11-21 00:00:00', 'BUY', 500);");
+
+                // Valuations ONLY for 20 and 22 (missing 21)
+                // TotalValue series: 1000 -> 1700
+                await Exec(conn, @"insert into portfolio_valuation(portfolio_id, base_currency, valuation_date, total_value) values
+                           (1,'EUR','2025-11-20 00:00:00',1000),
+                           (1,'EUR','2025-11-22 00:00:00',1700);");
+            }
+
+            var factory = new TestConnFactory(_fixture.ConnectionString);
+
+            var (baseCurrency, points) = await ValuationSummaryCalculator.LoadValuationHistoryAsync(
+                portfolioId: 1,
+                from: new DateTime(2025, 11, 20),
+                to: new DateTime(2025, 11, 22),
+                dbConnectionFactory: factory);
+
+            baseCurrency.Should().Be("EUR");
+            points.Should().HaveCount(2);
+
+            // Day 20
+            points[0].Date.Should().Be(new DateOnly(2025, 11, 20));
+            points[0].TotalValue.Should().Be(1000m);
+            points[0].AbsoluteChange.Should().Be(0m);
+            points[0].PercentChange.Should().Be(0m);
+            points[0].NetFlow.Should().Be(1000m);
+            points[0].CumulativeNetFlow.Should().Be(1000m);
+            points[0].PnL.Should().Be(0m);
+            points[0].Return.Should().Be(0m);
+
+            // Day 22
+            // The transaction on 21 must be reflected in cumulative, but NOT in NetFlowToday
+            points[1].Date.Should().Be(new DateOnly(2025, 11, 22));
+            points[1].TotalValue.Should().Be(1700m);
+            points[1].AbsoluteChange.Should().Be(700m);
+            points[1].PercentChange.Should().Be(0.7m);
+            points[1].NetFlow.Should().Be(0m);
+            points[1].CumulativeNetFlow.Should().Be(1500m);
+            points[1].PnL.Should().Be(200m);
+            points[1].Return.Should().Be(0.133m); // 200/1500 = 0.13333.. -> AwayFromZero Round(3) => 0.133 because the 4th decimal is 3
+        }
+
         private static async Task Exec(Npgsql.NpgsqlConnection conn, string sql)
         {
             await using var cmd = new Npgsql.NpgsqlCommand(sql, conn);

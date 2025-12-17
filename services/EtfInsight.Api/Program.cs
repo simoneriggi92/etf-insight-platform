@@ -260,10 +260,17 @@ app.MapGet("/portfolios/{id:int}/valuation/summary", async (
     {
         (string? baseCurrency, List<ValuationPoint> points) = await ValuationSummaryCalculator.LoadValuationHistoryAsync(id, from, to, dbConnectionFactory);
 
-        var valuationSummary = await ValuationSummaryCalculator.CalculateSummaryAsync(points);
+        if (points.Count == 0)
+        {
+            return Results.NotFound(new
+            {
+                PortfolioId = id,
+                BaseCurrency = baseCurrency,
+                HasData = false
+            });
+        }
 
-        valuationSummary.PortfolioId = id;
-        valuationSummary.BaseCurrency = baseCurrency;
+        var valuationSummary = ValuationSummaryCalculator.ComputeSummary(points, portfolioId: id, baseCurrency: baseCurrency);
 
         return Results.Ok(valuationSummary);
     }

@@ -182,81 +182,96 @@ namespace EtfInsight.Api
             return (baseCurrency, points);
         }
 
-        public static ValuationSummary Compute(IReadOnlyList<ValuationPoint> points)
+        public static ValuationSummary ComputeSummary(IReadOnlyList<ValuationPoint> points, int portfolioId = 0, string? baseCurrency = null)
         {
-            if (points.Count == 0)
+            if (points == null || points.Count == 0)
             {
-                return Results.NotFound(new
-                {
-                    PortfolioId = id,
-                    BaseCurrency = baseCurrency,
-                    HasData = false
-                });
+                return new ValuationSummary(
+                    PortfolioId: portfolioId,
+                    BaseCurrency: baseCurrency,
+                    HasData: false,
+                    StartValue: 0m,
+                    EndValue: 0m,
+                    NetContributions: 0m,
+                    PnL: 0m,
+                    TotalReturn: 0m,
+                    BestDayChange: 0m,
+                    WorstDayChange: 0m,
+                    MaxValue: 0m,
+                    MinValue: 0m,
+                    MaxDrawdown: 0m,
+                    MaxDrawdownStart: DateOnly.MinValue,
+                    MaxDrawdownEnd: DateOnly.MinValue,
+                    Days: 0
+                );
             }
-
-            var firstPoint = points.First();
-            var lastPoint = points.Last();
-
-            var startValue = firstPoint.TotalValue;
-            var endValue = lastPoint.TotalValue;
-            var netContributions = lastPoint.CumulativeNetFlow;
-            var pnL = lastPoint.PnL;
-            var totalReturn = lastPoint.Return;
-            var bestDayChange = points.Max(p => p.PercentChange);
-            var worstDayChange = points.Min(p => p.PercentChange);
-            var days = points.Count;
-
-            var maxValue = points.Max(p => p.TotalValue);
-            var minValue = points.Min(p => p.TotalValue);
-
-            // Calculate drawdowns
-            var maxDrawdown = 0m;
-            var maxDDStart = firstPoint.Date;
-            var maxDDEnd = firstPoint.Date;
-            var peak = firstPoint.TotalValue;
-            var peakDate = firstPoint.Date;
-
-            foreach (var point in points)
+            else
             {
-                if (point.TotalValue > peak)
+
+                var firstPoint = points.First();
+                var lastPoint = points.Last();
+
+                var startValue = firstPoint.TotalValue;
+                var endValue = lastPoint.TotalValue;
+                var netContributions = lastPoint.CumulativeNetFlow;
+                var pnL = lastPoint.PnL;
+                var totalReturn = lastPoint.Return;
+                var bestDayChange = points.Max(p => p.PercentChange);
+                var worstDayChange = points.Min(p => p.PercentChange);
+                var days = points.Count;
+
+                var maxValue = points.Max(p => p.TotalValue);
+                var minValue = points.Min(p => p.TotalValue);
+
+                // Calculate drawdowns
+                var maxDrawdown = 0m;
+                var maxDDStart = firstPoint.Date;
+                var maxDDEnd = firstPoint.Date;
+                var peak = firstPoint.TotalValue;
+                var peakDate = firstPoint.Date;
+
+                foreach (var point in points)
                 {
-                    peak = point.TotalValue;
-                    peakDate = point.Date;
+                    if (point.TotalValue > peak)
+                    {
+                        peak = point.TotalValue;
+                        peakDate = point.Date;
+                    }
+
+                    if (peak <= 0)
+                    {
+                        continue;
+                    }
+
+                    var drawdown = (point.TotalValue - peak) / peak; // <= 0
+
+                    if (drawdown < maxDrawdown)
+                    {
+                        maxDrawdown = drawdown;
+                        maxDDStart = peakDate;
+                        maxDDEnd = point.Date;
+                    }
                 }
 
-                if (peak <= 0)
-                {
-                    continue;
-                }
-
-                var drawdown = (point.TotalValue - peak) / peak; // <= 0
-
-                if (drawdown < maxDrawdown)
-                {
-                    maxDrawdown = drawdown;
-                    maxDDStart = peakDate;
-                    maxDDEnd = point.Date;
-                }
+                return new ValuationSummary(
+                    PortfolioId: portfolioId,
+                    BaseCurrency: baseCurrency,
+                    HasData: true,
+                    StartValue: startValue,
+                    EndValue: endValue,
+                    NetContributions: netContributions,
+                    PnL: pnL,
+                    TotalReturn: totalReturn,
+                    BestDayChange: bestDayChange,
+                    WorstDayChange: worstDayChange,
+                    MaxValue: maxValue,
+                    MinValue: minValue,
+                    MaxDrawdown: maxDrawdown,
+                    MaxDrawdownStart: maxDDStart,
+                    MaxDrawdownEnd: maxDDEnd,
+                    Days: days
+                );
             }
-
-            return new ValuationSummary(
-                PortfolioId: 0, // Placeholder, should be set by caller
-                BaseCurrency: null, // Placeholder, should be set by caller
-                HasData: true,
-                StartValue: startValue, 2,
-                EndValue: endValue,
-                NetContributions: netContributions,
-                PnL: pnL,
-                TotalReturn: totalReturn,
-                BestDayChange: bestDayChange,
-                WorstDayChange: worstDayChange,
-                MaxValue: maxValue,
-                MinValue: minValue,
-                MaxDrawdown: maxDrawdown,
-                MaxDrawdownStart: maxDDStart,
-                MaxDrawdownEnd: maxDDEnd,
-                Days: days
-            );
         }
     }
 

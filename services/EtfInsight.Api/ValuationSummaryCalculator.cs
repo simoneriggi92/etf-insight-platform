@@ -168,13 +168,13 @@ namespace EtfInsight.Api
 
                 points.Add(new ValuationPoint(
                     DateOnly.FromDateTime(reader.GetDateTime(1)),
-                    Math.Round(reader.GetDecimal(2), 2),
-                    Math.Round(absoluteChange, 2),
-                    Math.Round(percentChange, 3),
-                    Math.Round(netFlowToday, 2),
-                    Math.Round(cumulativeNetFlow, 2),
-                    Math.Round(pnL, 2),
-                    Math.Round(performance, 3)
+                    MathRound(reader.GetDecimal(2), 2),
+                    MathRound(absoluteChange, 2),
+                    MathRound(percentChange, 3),
+                    MathRound(netFlowToday, 2),
+                    MathRound(cumulativeNetFlow, 2),
+                    MathRound(pnL, 2),
+                    MathRound(performance, 3)
                 ));
 
                 previousValue = currentValue;
@@ -272,6 +272,11 @@ namespace EtfInsight.Api
                     Days: days
                 );
             }
+        }
+
+        public static decimal MathRound(decimal value, int decimals = 3, MidpointRounding mode = MidpointRounding.AwayFromZero)
+        {
+            return Math.Round(value, decimals, mode); // rounding half up
         }
     }
 

@@ -98,6 +98,181 @@ namespace EtfInsight.Tests
             }
         }
 
+        [Fact]
+        public async Task LoadValuationHistoryAsync_WithSell_ComputesNegativeNetFlow_AndCorrectCumulative()
+        {
+            await using (var conn = new NpgsqlConnection(_fixture.ConnectionString))
+            {
+                await conn.OpenAsync();
+
+                await Exec(conn, @"drop table if exists portfolio_transaction;
+                           drop table if exists portfolio_valuation;
+                           drop table if exists portfolio;");
+
+                await Exec(conn, @"create table portfolio(
+                            id int primary key,
+                            name text not null
+                          );");
+
+                await Exec(conn, @"create table portfolio_transaction(
+                            portfolio_id int not null,
+                            trade_date timestamp without time zone not null,
+                            trade_type text not null,
+                            total_amount numeric not null
+                          );");
+
+                await Exec(conn, @"create table portfolio_valuation(
+                            portfolio_id int not null,
+                            base_currency text,
+                            valuation_date timestamp without time zone not null,
+                            total_value numeric not null
+                          );");
+
+                await Exec(conn, "insert into portfolio(id,name) values (1,'Test');");
+
+                // BUY day 20
+                await Exec(conn, @"insert into portfolio_transaction(portfolio_id, trade_date, trade_type, total_amount)
+                           values (1, '2025-11-20 00:00:00', 'BUY', 1000);");
+
+                // SELL day 22
+                await Exec(conn, @"insert into portfolio_transaction(portfolio_id, trade_date, trade_type, total_amount)
+                           values (1, '2025-11-22 00:00:00', 'SELL', 200);");
+
+                // Valuations 20-21-22 (deterministiche)
+                await Exec(conn, @"insert into portfolio_valuation(portfolio_id, base_currency, valuation_date, total_value) values
+                           (1,'EUR','2025-11-20 00:00:00',1000),
+                           (1,'EUR','2025-11-21 00:00:00',1100),
+                           (1,'EUR','2025-11-22 00:00:00', 950);");
+            }
+
+            var factory = new TestConnFactory(_fixture.ConnectionString);
+
+            var (baseCurrency, points) = await ValuationSummaryCalculator.LoadValuationHistoryAsync(
+                portfolioId: 1,
+                from: new DateTime(2025, 11, 20),
+                to: new DateTime(2025, 11, 22),
+                dbConnectionFactory: factory);
+
+            baseCurrency.Should().Be("EUR");
+            points.Should().HaveCount(3);
+
+            points[0].Date.Should().Be(new DateOnly(2025, 11, 20));
+            points[0].TotalValue.Should().Be(1000m);
+            points[0].AbsoluteChange.Should().Be(0m);
+            points[0].PercentChange.Should().Be(0m);
+            points[0].NetFlow.Should().Be(1000m);
+            points[0].CumulativeNetFlow.Should().Be(1000m);
+            points[0].PnL.Should().Be(0m);
+            points[0].Return.Should().Be(0m);
+
+            points[1].Date.Should().Be(new DateOnly(2025, 11, 21));
+            points[1].TotalValue.Should().Be(1100m);
+            points[1].AbsoluteChange.Should().Be(100m);
+            points[1].PercentChange.Should().Be(0.1m);
+            points[1].NetFlow.Should().Be(0m);
+            points[1].CumulativeNetFlow.Should().Be(1000m);
+            points[1].PnL.Should().Be(100m);
+            points[1].Return.Should().Be(0.1m);
+
+            points[2].Date.Should().Be(new DateOnly(2025, 11, 22));
+            points[2].TotalValue.Should().Be(950m);
+            points[2].AbsoluteChange.Should().Be(-150m);
+            points[2].PercentChange.Should().Be(-0.136m); // rounded to 3 decimals
+            points[2].NetFlow.Should().Be(-200m);          //SELL must become negative net flow
+            points[2].CumulativeNetFlow.Should().Be(800m);
+            points[2].PnL.Should().Be(150m);
+            points[2].Return.Should().Be(0.188m);          // rounded to 3 decimals
+        }
+
+        [Fact]
+        public async Task LoadValuationHistoryAsync_WithTwoBuys_ComputesCumulativeAndDailyNetFlowCorrectly()
+        {
+            await using (var conn = new NpgsqlConnection(_fixture.ConnectionString))
+            {
+                await conn.OpenAsync();
+
+                await Exec(conn, @"drop table if exists portfolio_transaction;
+                           drop table if exists portfolio_valuation;
+                           drop table if exists portfolio;");
+
+                await Exec(conn, @"create table portfolio(
+                            id int primary key,
+                            name text not null
+                          );");
+
+                await Exec(conn, @"create table portfolio_transaction(
+                            portfolio_id int not null,
+                            trade_date timestamp without time zone not null,
+                            trade_type text not null,
+                            total_amount numeric not null
+                          );");
+
+                await Exec(conn, @"create table portfolio_valuation(
+                            portfolio_id int not null,
+                            base_currency text,
+                            valuation_date timestamp without time zone not null,
+                            total_value numeric not null
+                          );");
+
+                await Exec(conn, "insert into portfolio(id,name) values (1,'Test');");
+
+                // BUY day 20: +1000
+                await Exec(conn, @"insert into portfolio_transaction(portfolio_id, trade_date, trade_type, total_amount)
+                           values (1, '2025-11-20 00:00:00', 'BUY', 1000);");
+
+                // BUY day 21: +500
+                await Exec(conn, @"insert into portfolio_transaction(portfolio_id, trade_date, trade_type, total_amount)
+                           values (1, '2025-11-21 00:00:00', 'BUY', 500);");
+
+                // Valuations 20-21-22 (TotalValue series: 1000 -> 1600 -> 1700)
+                await Exec(conn, @"insert into portfolio_valuation(portfolio_id, base_currency, valuation_date, total_value) values
+                           (1,'EUR','2025-11-20 00:00:00',1000),
+                           (1,'EUR','2025-11-21 00:00:00',1600),
+                           (1,'EUR','2025-11-22 00:00:00',1700);");
+            }
+
+            var factory = new TestConnFactory(_fixture.ConnectionString);
+
+            var (baseCurrency, points) = await ValuationSummaryCalculator.LoadValuationHistoryAsync(
+                portfolioId: 1,
+                from: new DateTime(2025, 11, 20),
+                to: new DateTime(2025, 11, 22),
+                dbConnectionFactory: factory);
+
+            baseCurrency.Should().Be("EUR");
+            points.Should().HaveCount(3);
+
+            // Day 20
+            points[0].Date.Should().Be(new DateOnly(2025, 11, 20));
+            points[0].TotalValue.Should().Be(1000m);
+            points[0].AbsoluteChange.Should().Be(0m);
+            points[0].PercentChange.Should().Be(0m);
+            points[0].NetFlow.Should().Be(1000m);
+            points[0].CumulativeNetFlow.Should().Be(1000m);
+            points[0].PnL.Should().Be(0m);
+            points[0].Return.Should().Be(0m);
+
+            // Day 21
+            points[1].Date.Should().Be(new DateOnly(2025, 11, 21));
+            points[1].TotalValue.Should().Be(1600m);
+            points[1].AbsoluteChange.Should().Be(600m);
+            points[1].PercentChange.Should().Be(0.6m);
+            points[1].NetFlow.Should().Be(500m);
+            points[1].CumulativeNetFlow.Should().Be(1500m);
+            points[1].PnL.Should().Be(100m);
+            points[1].Return.Should().Be(0.067m);
+
+            // Day 22
+            points[2].Date.Should().Be(new DateOnly(2025, 11, 22));
+            points[2].TotalValue.Should().Be(1700m);
+            points[2].AbsoluteChange.Should().Be(100m);
+            points[2].PercentChange.Should().Be(0.063m);
+            points[2].NetFlow.Should().Be(0m);
+            points[2].CumulativeNetFlow.Should().Be(1500m);
+            points[2].PnL.Should().Be(200m);
+            points[2].Return.Should().Be(0.133m);
+        }
+
         private static async Task Exec(Npgsql.NpgsqlConnection conn, string sql)
         {
             await using var cmd = new Npgsql.NpgsqlCommand(sql, conn);

@@ -45,7 +45,7 @@ namespace EtfInsight.Api
 
             // Get all transactions from the beginning up to 'to' date to calculate net flows
             var transactionsSql = @"
-                select pt.trade_date,
+                select (pt.trade_date::date) as trade_date,
                     sum(case 
                             when pt.trade_type = 'BUY' then +pt.total_amount
                             when pt.trade_type = 'SELL'then -pt.total_amount
@@ -54,8 +54,8 @@ namespace EtfInsight.Api
                 from portfolio_transaction pt
                 where pt.portfolio_id = @portfolio_id
                     and pt.trade_date <= @maxValuationDate
-                group by pt.trade_date
-                order by pt.trade_date asc
+                group by (pt.trade_date::date)
+                order by (pt.trade_date::date)
                 ";
 
             // Read and save the net flow per date
@@ -83,6 +83,7 @@ namespace EtfInsight.Api
                 {
                     var tradeDate = transactionsReader.GetDateTime(0).Date;
                     var netFlowAmount = transactionsReader.GetDecimal(1);
+
                     transactions[tradeDate] = netFlowAmount;
                 }
             }
@@ -119,7 +120,7 @@ namespace EtfInsight.Api
             await using var reader = await cmd.ExecuteReaderAsync();
 
             var points = new List<ValuationPoint>();
-            var baseCurrency = string.Empty;
+            var baseCurrency = null as string;
 
             var previousValue = 0m;
             var percentChange = 0m;

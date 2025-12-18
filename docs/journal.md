@@ -100,3 +100,13 @@
 - Created UnitTest based on container and clean PostgreSql image to test valuation computation logic:
   - Implemented 'PostgresFixture' class to handle contrainer lifecycle: initialize and dispose PostgresSql container
   - Implemented 'ValuationHistoryDbTests' unitTest to test valuation logic computation
+
+## 2025-12-17 Day 14
+
+- Added further testCases for 'ValuationHistoryDbTests' to test valuation logic computation
+
+## 2025-12-18 Day 15
+
+- Added 'killer tests' for 'ValuationHistoryDbTests' to test valuation logic computation
+- Fixed bug in 'ValuationSummaryCalculator', to provide the sum of flows of the same day from db casting the datetime in date
+- Started analysis of MultiCurrency/FX requirements

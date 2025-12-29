@@ -88,3 +88,16 @@ docker-compose.override.yml
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Python
+data/raw/*
+data/processed/*
+docs/daily-log.md
+*.pyc
+__pycache__/
+.venv/
+.env
+*.db
+.vs/
+bin/
+obj/

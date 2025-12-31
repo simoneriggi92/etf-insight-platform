@@ -91,8 +91,19 @@ def main():
     total_records = 0
     total_inserted = 0
 
+    # Process JSON files in raw/ and raw/history
+
+    search_patterns = [
+        raw_dir.glob("*.json"),
+        raw_dir.glob("history/*.json"),
+    ]
+
+    all_files = []
+    for pattern in search_patterns:
+        all_files.extend(pattern)
+
     # Process all JSON files
-    for json_file in sorted(raw_dir.glob("*.json")):
+    for json_file in sorted(all_files):
         print(f"Processing {json_file.name}...")
         total_files += 1
 

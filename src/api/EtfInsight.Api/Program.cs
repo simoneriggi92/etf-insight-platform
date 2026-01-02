@@ -140,8 +140,8 @@ app.MapGet("/api/prices", async (
     return Results.Ok(new
     {
         symbol = symbol.ToUpper(),
-        from = fromDate.Date,
-        to = toDate.Date,
+        from = fromDate.ToString("yyyy-MM-dd"),
+        to = toDate.ToString("yyyy-MM-dd"),
         count = prices.Count(),
         data = prices
     });
@@ -167,11 +167,11 @@ app.MapGet("/api/prices/stats", async (
     // Default date range: last 30 days
     var toDate = string.IsNullOrWhiteSpace(to) ?
         DateTime.UtcNow.Date
-        : DateTime.Parse(to);
+        : DateTime.Parse(to).Date;
 
     var fromDate = string.IsNullOrWhiteSpace(from) ?
         DateTime.UtcNow.AddDays(-365).Date // Default: 1 year
-        : DateTime.Parse(from);
+        : DateTime.Parse(from).Date;
 
     var query = @"
     SELECT 
@@ -180,7 +180,7 @@ app.MapGet("/api/prices/stats", async (
         ROUND(MIN(low_price)::numeric, 2) as min_price,
         ROUND(MAX(high_price)::numeric, 2) as max_price,
         ROUND(AVG(close_price)::numeric, 2) as avg_price,
-        ROUND(((MAX(high_price) - MIN(low_price)) / NULLIF(MIN(low_price), 0)) * 100, 2) as price_range_pct,
+        ROUND(((MAX(high_price) - MIN(low_price)) / NULLIF(MIN(low_price), 0)) * 100, 2) as price_range_pct, -- Percentage price range, NULLIF to avoid division by zero
         SUM(volume) as total_volume,
         ROUND(AVG(volume)::numeric, 0) as avg_daily_volume
     FROM etf_prices
@@ -204,7 +204,7 @@ app.MapGet("/api/prices/stats", async (
     return Results.Ok(new
     {
         symbol = symbol.ToUpper(),
-        date_range = new { from = fromDate.Date, to = toDate.Date },
+        date_range = new { from = fromDate.ToString("yyyy-MM-dd"), to = toDate.ToString("yyyy-MM-dd") },
         statistics = stats
     });
 })

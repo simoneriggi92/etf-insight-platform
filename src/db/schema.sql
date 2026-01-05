@@ -1,3 +1,6 @@
+-- PostgreSQL Schema
+-- This file uses PostgreSQL-specific syntax
+
 CREATE TABLE
 IF NOT EXISTS etf_prices
 (

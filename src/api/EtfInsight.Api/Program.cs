@@ -40,7 +40,6 @@ if (app.Environment.IsDevelopment())
 // ENDPOINTS
 // ============================================================================
 
-
 // Health check endpoint
 app.MapGet("/health", () => Results.Ok(new
 {
@@ -212,4 +211,219 @@ app.MapGet("/api/prices/stats", async (
 .WithTags("Prices")
 .Produces<object>(StatusCodes.Status200OK);
 
+// ============================================================================
+// PORTFOLIO ENDPOINTS
+// ============================================================================
+
+// Create a new portfolio
+app.MapPost("/api/portfolios", async (
+    IDbConnection db,
+    PortfolioCreateRequest request) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Name))
+    {
+        return Results.BadRequest(new { error = "Portfolio name is required." });
+    }
+
+    var query = @"
+    INSERT INTO portfolios (name, description, base_currency)
+    VALUES (@Name, @Description, @BaseCurrency)
+    RETURNING id, name, description, base_currency, created_at";
+
+    var portfolio = await db.QueryFirstAsync(query, new
+    {
+        Name = request.Name,
+        Description = request.Description ?? string.Empty,
+        BaseCurrency = request.BaseCurrency ?? "USD"
+    });
+
+    return Results.Created($"/api/portfolios/{portfolio.id}", portfolio);
+})
+.WithName("CreatePortfolio")
+.WithTags("Portfolios")
+.Produces<object>(StatusCodes.Status201Created)
+.Produces(StatusCodes.Status400BadRequest);
+
+// Get all portfolios
+app.MapGet("/api/portfolios", async (IDbConnection db) =>
+{
+    var query = @"
+    SELECT p.id, p.name, p.description, p.base_currency, p.created_at,
+        COUNT (t.id) as transaction_count,
+        MIN(t.transaction_date) as first_transaction_date,
+        MAX(t.transaction_date) as last_transaction_date
+    FROM portfolios p
+    LEFT JOIN transactions t on p.id = t.portfolio_id
+    GROUP BY p.id, p.name, p.description, p.base_currency, p.created_at
+    ORDER BY p.created_at DESC";
+
+    var portfolios = await db.QueryAsync(query);
+    return Results.Ok(portfolios);
+})
+.WithName("GetPortfolios")
+.WithTags("Portfolios")
+.Produces<IEnumerable<object>>(StatusCodes.Status200OK);
+
+
+// Get portfolio by ID with sumamry
+app.MapGet("/api/portfolios/{id:int}", async (int id, IDbConnection db) =>
+{
+    var query = @"
+        SELECT id, name, description, base_currency, created_at
+        FROM portfolios
+        WHERE id = @id";
+
+    var portfolio = await db.QuerySingleOrDefaultAsync(query, new { Id = id });
+
+    if (portfolio == null)
+    {
+        return Results.NotFound(new { error = $"Portfolio with ID {id} not found." });
+    }
+
+    // Get transactions summary
+    var transactionQuery = @"
+        SELECT 
+            COUNT(*) as total_transactions,
+            COUNT(DISTINCT symbol) as unique_symbols,
+            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity * price ELSE 0 END) as total_invested,
+            SUM(CASE WHEN transaction_type = 'SELL' THEN quantity * price ELSE 0 END) as total_proceeds
+        FROM transactions
+        WHERE portfolio_id = @Id";
+
+    var summary = await db.QuerySingleAsync(transactionQuery, new { Id = id });
+
+    return Results.Ok(new
+    {
+        portfolio,
+        summary
+    });
+})
+.WithName("GetPortfolio")
+.WithTags("Portfolios")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound);
+
+// Add transaction to portfolio
+app.MapPost("/api/portfolios/{portfolioId:int}/transactions", async (
+    int portfolioId,
+    IDbConnection db,
+    TransactionCreateRequest request) =>
+{
+    // Validate portfolio existence
+    var portfolioExists = await db.ExecuteScalarAsync<bool>(
+        "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
+        new { Id = portfolioId });
+
+    if (!portfolioExists)
+    {
+        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+    }
+
+    var symbolExists = await db.ExecuteScalarAsync<bool>(
+        "SELECT EXISTS(SELECT 1 FROM etf_prices WHERE symbol = @Symbol)",
+        new { Symbol = request.Symbol.ToUpper() });
+
+    if (!symbolExists)
+    {
+        return Results.BadRequest(new { error = $"Symbol {request.Symbol} is not found in price database." });
+    }
+
+    // Validate transaction data 
+    if (string.IsNullOrWhiteSpace(request.Symbol))
+    {
+        return Results.BadRequest(new { error = "Symbol is required." });
+    }
+
+    if (!new[] { "BUY", "SELL" }.Contains(request.TransactionType.ToUpper()))
+    {
+        return Results.BadRequest(new { error = "TransactionType must be either 'BUY' or 'SELL'." });
+    }
+
+    if (request.Quantity <= 0)
+    {
+        return Results.BadRequest(new { error = "Quantity must be positive." });
+    }
+
+    if (request.Price <= 0)
+    {
+        return Results.BadRequest(new { error = "Price must be positive." });
+    }
+
+    // Insert transaction
+    var query = @"
+    INSERT INTO transactions (portfolio_id, symbol, transaction_type, quantity, price, transaction_date, notes)
+    VALUES (@PortfolioId, @Symbol, @TransactionType, @Quantity, @Price, @TransactionDate, @Notes)
+    RETURNING id, portfolio_id, symbol, transaction_type, quantity, price, transaction_date, notes, created_at";
+
+    var transaction = await db.QuerySingleAsync(query, new
+    {
+        PortfolioId = portfolioId,
+        Symbol = request.Symbol.ToUpper(),
+        TransactionType = request.TransactionType.ToUpper(),
+        Quantity = request.Quantity,
+        Price = request.Price,
+        TransactionDate = request.TransactionDate,
+        Notes = request.Notes ?? string.Empty
+    });
+
+    return Results.Created(
+        $"/api/portfolios/{portfolioId}/transactions/{transaction.id}",
+        transaction);
+})
+.WithName("AddTransaction")
+.WithTags("Portfolios")
+.Produces<object>(StatusCodes.Status201Created)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status404NotFound);
+
+
+// Get portfolio transactions
+app.MapGet("/api/portfolios/{portfolioId:int}/transactions", async (int portfolioId, IDbConnection db) =>
+{
+    // Validate portfolio existence
+    var portfolioExists = await db.ExecuteScalarAsync<bool>(
+        "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
+        new { Id = portfolioId });
+
+    if (!portfolioExists)
+    {
+        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+    }
+
+    var query = @"
+    SELECT id, portfolio_id, symbol, transaction_type, quantity, price, transaction_date, notes, created_at
+    FROM transactions
+    WHERE portfolio_id = @PortfolioId
+    ORDER BY transaction_date DESC, created_at DESC";
+
+    var transactions = await db.QueryAsync(query, new { PortfolioId = portfolioId });
+    return Results.Ok(new
+    {
+        portfolio_id = portfolioId,
+        count = transactions.Count(),
+        transactions
+    });
+})
+.WithName("GetPortfolioTransactions")
+.WithTags("Portfolios")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound);
+
 app.Run();
+
+record PortfolioCreateRequest
+(
+    string Name,
+    string? Description,
+    string? BaseCurrency
+);
+
+record TransactionCreateRequest
+(
+    string Symbol,
+    string TransactionType,
+    decimal Quantity,
+    decimal Price,
+    DateTime TransactionDate,
+    string? Notes
+);

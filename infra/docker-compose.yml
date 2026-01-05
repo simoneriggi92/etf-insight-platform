@@ -18,7 +18,7 @@ services:
 
   api:
     build:
-      context: ./src/services/api/EtfInsight.Api
+      context: ../src/api/EtfInsight.Api
       dockerfile: Dockerfile
     ports:
       - "5000:8080"
@@ -26,6 +26,6 @@ services:
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=etfinsight;Username=etfinsight;Password=devpassword123
     depends_on:
       - postgres
-      
+
 volumes:
   postgres_data:

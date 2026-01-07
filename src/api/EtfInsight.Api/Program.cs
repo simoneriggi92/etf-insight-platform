@@ -409,6 +409,128 @@ app.MapGet("/api/portfolios/{portfolioId:int}/transactions", async (int portfoli
 .Produces<object>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status404NotFound);
 
+
+app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
+    int portfolioId,
+    string? date,
+    IDbConnection db) =>
+{
+
+    // Validate portfolio existence
+    var portfolioExists = await db.ExecuteScalarAsync<bool>(
+        "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
+        new { Id = portfolioId });
+
+    if (!portfolioExists)
+    {
+        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+    }
+
+    // Default valuation date: today
+    var valuationDate = string.IsNullOrWhiteSpace(date) ?
+        DateTime.UtcNow.Date.ToString("yyyy-MM-dd")
+        : date;
+
+    // Validate date format
+    if (!DateTime.TryParse(valuationDate, out DateTime parsedDate))
+    {
+        return Results.BadRequest(new { error = "Invalid date format. Use YYYY-MM-DD." });
+    }
+
+    // Calculate holdings as of the valuation date
+    var holdingsQuery = @"
+        SELECT
+            symbol,
+            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) as total_quantity
+        FROM transactions
+        WHERE portfolio_id = @PortfolioId
+        AND transaction_date <= @ValuationDate
+        GROUP BY symbol
+        HAVING SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) > 0
+    ";
+
+    var holdings = await db.QueryAsync(holdingsQuery, new
+    {
+        PortfolioId = portfolioId,
+        ValuationDate = parsedDate
+    });
+
+    if (!holdings.Any())
+    {
+        return Results.Ok(new
+        {
+            portfolio_id = portfolioId,
+            valuation_date = parsedDate.Date.ToString("yyyy-MM-dd"),
+            total_value = 0.00m,
+            message = "No holdings in the portfolio as of the specified date.",
+            holdings = new List<object>()
+        });
+    }
+
+    // Get prices for each holding on valuation date
+    var valuationDetails = new List<object>();
+    decimal totalValue = 0;
+
+    foreach (var holding in holdings)
+    {
+        string symbol = (string)holding.symbol;
+        decimal quantity = (decimal)holding.total_quantity;
+
+        var priceQuery = @"
+            SELECT close_price
+            FROM etf_prices
+            WHERE symbol = @Symbol
+            AND price_date <= @ValuationDate
+            ORDER BY price_date DESC
+            LIMIT 1
+        ";
+
+        var priceRecord = await db.ExecuteScalarAsync<decimal?>(priceQuery, new
+        {
+            Symbol = symbol,
+            ValuationDate = parsedDate
+        });
+
+        if (priceRecord == null)
+        {
+            valuationDetails.Add(new
+            {
+                symbol,
+                quantity,
+                price = (decimal?)null,
+                value = (decimal?)null,
+                note = "No price data available on or before valuation date."
+            });
+            continue;
+        }
+
+        var value = quantity * priceRecord.Value;
+        totalValue += value;
+
+        valuationDetails.Add(new
+        {
+            symbol,
+            quantity,
+            price = Math.Round(priceRecord.Value, 2),
+            value = Math.Round(value, 2)
+        });
+    }
+
+    return Results.Ok(new
+    {
+        portfolio_id = portfolioId,
+        valuation_date = parsedDate.Date.ToString("yyyy-MM-dd"),
+        total_value = Math.Round(totalValue, 2),
+        details = valuationDetails
+    });
+})
+.WithName("GetPortfolioValuation")
+.WithTags("Portfolios")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status404NotFound);
+
+
 app.Run();
 
 record PortfolioCreateRequest

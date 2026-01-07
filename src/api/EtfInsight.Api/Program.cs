@@ -530,6 +530,128 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
 .Produces(StatusCodes.Status400BadRequest)
 .Produces(StatusCodes.Status404NotFound);
 
+// Get portfolio valuation history over date range 
+app.MapGet("/api/portfolios/{portfolioId:int}/valuation/history", async (
+    int portfolioId,
+    string? from,
+    string? to,
+    IDbConnection db) =>
+{
+
+    var portfolioExists = await db.ExecuteScalarAsync<bool>(
+          "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
+          new { Id = portfolioId });
+
+    if (!portfolioExists)
+    {
+        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+    }
+
+    // Default date range: last 30 days
+    var toDate = string.IsNullOrWhiteSpace(to) ?
+        DateTime.UtcNow.Date
+        : DateTime.Parse(to).Date;
+
+    var fromDate = string.IsNullOrWhiteSpace(from) ?
+        DateTime.UtcNow.AddDays(-30).Date
+        : DateTime.Parse(from).Date;
+
+    // Get all trading days in the date range
+    var tradingDaysQuery = @"
+        SELECT DISTINCT price_date::timestamp as price_date
+        FROM etf_prices
+        WHERE price_date >= @FromDate AND price_date <= @ToDate
+        ORDER BY price_date ASC
+    ";
+
+    var tradingDays = await db.QueryAsync<DateTime>(tradingDaysQuery, new
+    {
+        FromDate = fromDate,
+        ToDate = toDate
+    });
+
+    var valuationHistory = new List<object>();
+
+    foreach (var day in tradingDays)
+    {
+        var dateStr = day.ToString("yyyy-MM-dd");
+
+        // Calculate holdings as of the day
+        var holdingsQuery = @"
+        SELECT
+            symbol,
+            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) as total_quantity
+        FROM transactions
+        WHERE portfolio_id = @PortfolioId
+        AND transaction_date <= @Date
+        GROUP BY symbol
+        HAVING SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) > 0
+    ";
+
+        var holdings = await db.QueryAsync(holdingsQuery, new
+        {
+            PortfolioId = portfolioId,
+            Date = day
+        });
+
+        if (!holdings.Any())
+        {
+            valuationHistory.Add(new
+            {
+                date = dateStr,
+                total_value = 0.00m
+            });
+            continue;
+        }
+
+
+        decimal totalValue = 0;
+
+        foreach (var holding in holdings)
+        {
+            string symbol = (string)holding.symbol;
+            decimal quantity = (decimal)holding.total_quantity;
+
+            var priceQuery = @"
+            SELECT close_price
+            FROM etf_prices
+            WHERE symbol = @Symbol
+            AND price_date <= @Date
+            ORDER BY price_date DESC
+            LIMIT 1
+        ";
+
+            var priceRecord = await db.ExecuteScalarAsync<decimal?>(priceQuery, new
+            {
+                Symbol = symbol,
+                Date = day
+            });
+
+            if (priceRecord != null)
+            {
+                totalValue += quantity * priceRecord.Value;
+            }
+        }
+
+        valuationHistory.Add(new
+        {
+            date = dateStr,
+            total_value = Math.Round(totalValue, 2)
+        });
+    }
+    return Results.Ok(new
+    {
+        portfolio_id = portfolioId,
+        date_range = new { from = fromDate.ToString("yyyy-MM-dd"), to = toDate.ToString("yyyy-MM-dd") },
+        data = valuationHistory.Count,
+        history = valuationHistory
+    });
+})
+.WithName("GetPortfolioValuationHistory")
+.WithTags("Portfolios")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound);
+
 
 app.Run();
 

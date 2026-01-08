@@ -652,6 +652,242 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation/history", async (
 .Produces<object>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status404NotFound);
 
+app.MapGet("/api/portfolios/{portfolioId:int}/performance", async (
+    int portfolioId,
+    string? from,
+    string? to,
+    IDbConnection db) =>
+{
+    // Validate portfolio existence
+    var portfolioExists = await db.ExecuteScalarAsync<bool>(
+        "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
+        new { Id = portfolioId });
+
+    if (!portfolioExists)
+    {
+        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+    }
+
+    // Default range: inception to today
+    var toDate = string.IsNullOrWhiteSpace(to) ?
+        DateTime.UtcNow.ToString("yyyy-MM-dd")
+        : to;
+
+    // Get first transaction date as default start
+    var firstTransactionDateResult = await db.ExecuteScalarAsync(
+        "SELECT MIN(transaction_date) FROM transactions WHERE portfolio_id = @Id",
+        new { Id = portfolioId });
+
+    if (firstTransactionDateResult == null)
+    {
+        return Results.Ok(new
+        {
+            portfolio_id = portfolioId,
+            message = "No transactions found in the portfolio to calculate performance.",
+            metrics = new { }
+        });
+    }
+
+    var firstTransactionDate = firstTransactionDateResult is DateOnly dateOnly
+        ? dateOnly.ToString("yyyy-MM-dd")
+        : firstTransactionDateResult.ToString() ?? string.Empty;
+
+    var fromDateStr = string.IsNullOrWhiteSpace(from) ?
+        firstTransactionDate
+        : from;
+
+    var fromDate = DateTime.Parse(fromDateStr);
+    var toDateParsed = DateTime.Parse(toDate);
+
+    // Calculate cost basis (total invested)
+    var costBasisQuery = @"
+        SELECT 
+            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity * price ELSE 0 END) as total_bought,
+            SUM(CASE WHEN transaction_type = 'SELL' THEN quantity * price ELSE 0 END) as total_sold
+        FROM transactions
+        WHERE portfolio_id = @PortfolioId
+        AND transaction_date >= @FromDate
+        AND transaction_date <= @ToDate";
+
+    var costBasis = await db.QuerySingleAsync(costBasisQuery, new
+    {
+        PortfolioId = portfolioId,
+        FromDate = fromDate,
+        ToDate = toDateParsed
+    });
+
+    decimal totalInvested = costBasis.total_bought ?? 0;
+    decimal totalProceeds = costBasis.total_sold ?? 0;
+    decimal netInvested = totalInvested - totalProceeds;
+
+    // Get valuation history for the period
+    var valuationHistoryQuery = @"
+        WITH trading_days AS (
+            SELECT DISTINCT price_date as date
+            FROM etf_prices
+            WHERE price_date >= @FromDate
+              AND price_date <= @ToDate
+            ORDER BY price_date
+        ),
+        daily_holdings AS (
+            SELECT 
+                td.date,
+                t.symbol,
+                SUM(CASE WHEN t.transaction_type = 'BUY' THEN t.quantity ELSE -t.quantity END) as quantity
+            FROM trading_days td
+            CROSS JOIN (SELECT DISTINCT symbol FROM transactions WHERE portfolio_id = @PortfolioId) symbols
+            LEFT JOIN transactions t ON t.symbol = symbols.symbol
+                AND t.portfolio_id = @PortfolioId
+                AND t.transaction_date <= td.date
+            WHERE t.symbol IS NOT NULL
+            GROUP BY td.date, t.symbol
+            HAVING SUM(CASE WHEN t.transaction_type = 'BUY' THEN t.quantity ELSE -t.quantity END) > 0
+        )
+        SELECT 
+            dh.date,
+            SUM(dh.quantity * p.close_price) as total_value
+        FROM daily_holdings dh
+        JOIN etf_prices p ON p.symbol = dh.symbol AND p.price_date = dh.date
+        GROUP BY dh.date
+        ORDER BY dh.date";
+
+    var valuationHistory = await db.QueryAsync(valuationHistoryQuery, new
+    {
+        PortfolioId = portfolioId,
+        FromDate = fromDate,
+        ToDate = toDateParsed
+    });
+
+    if (!valuationHistory.Any())
+    {
+        return Results.Ok(new
+        {
+            portfolio_id = portfolioId,
+            date_range = new { from = fromDate.ToString("yyyy-MM-dd"), to = toDateParsed.ToString("yyyy-MM-dd") },
+            message = "No valuation data available for the specified period.",
+            metrics = new { }
+        });
+    }
+
+    // Calculate metrics
+    var startValue = valuationHistory.First().total_value;
+    var endValue = valuationHistory.Last().total_value;
+
+    // Total P&L = current value - net invested
+    var totalPnL = endValue - netInvested;
+
+    // Total Return % = (end value - net invested) / net invested * 100
+    var totalReturn = netInvested != 0 ? (totalPnL / netInvested) * 100 : 0;
+
+    // Find best and worst days
+    var dailyChanges = new List<dynamic>();
+    for (int i = 1; i < valuationHistory.Count(); i++)
+    {
+        var prevValue = (decimal)valuationHistory.ElementAt(i - 1).total_value;
+        var currValue = (decimal)valuationHistory.ElementAt(i).total_value;
+        var change = currValue - prevValue;
+        var changePercent = prevValue != 0 ? (change / prevValue) * 100 : 0;
+
+        dailyChanges.Add(new
+        {
+
+            date = valuationHistory.ElementAt(i).date.ToString("yyyy-MM-dd"),
+            value = currValue,
+            daily_change = Math.Round(change, 2),
+            daily_change_percent = changePercent
+        });
+    }
+
+    var bestDay = dailyChanges.OrderByDescending(d => d.daily_change_percent).FirstOrDefault();
+    var worstDay = dailyChanges.OrderBy(d => d.daily_change_percent).FirstOrDefault();
+
+    // Calculate max drawdown
+    decimal maxValue = startValue;
+    decimal maxDrawdown = 0;
+    DateTime? dradownStartDate = null;
+    DateTime? drawdownEndDate = null;
+
+    foreach (var point in valuationHistory)
+    {
+        var currentValue = point.total_value;
+        var currentDate = point.date is DateOnly pointDateOnly ? pointDateOnly.ToDateTime(TimeOnly.MinValue) : (DateTime)point.date;
+
+        if (currentValue > maxValue)
+        {
+            maxValue = currentValue;
+        }
+
+        var drawdown = ((maxValue - currentValue) / maxValue) * 100;
+
+        if (drawdown > maxDrawdown)
+        {
+            maxDrawdown = drawdown;
+            drawdownEndDate = currentDate;
+
+            // Find the start date of the drawdown
+            dradownStartDate = valuationHistory
+                .Where(v => (v.date is DateOnly vDateOnly1 ? vDateOnly1.ToDateTime(TimeOnly.MinValue) : (DateTime)v.date) <= currentDate && v.total_value == maxValue)
+                .Select(v => v.date is DateOnly vDateOnly2 ? vDateOnly2.ToDateTime(TimeOnly.MinValue) : (DateTime)v.date)
+                .FirstOrDefault();
+        }
+    }
+
+    return Results.Ok(new
+    {
+        portfolio_id = portfolioId,
+        date_range = new { from = fromDate.ToString("yyyy-MM-dd"), to = toDateParsed.ToString("yyyy-MM-dd") },
+        period_days = valuationHistory.Count(),
+
+        investment_summary = new
+        {
+            total_invested = Math.Round(totalInvested, 2),
+            total_proceeds = Math.Round(totalProceeds, 2),
+            net_invested = Math.Round(netInvested, 2),
+
+        },
+
+        valuation = new
+        {
+            start_value = Math.Round(startValue, 2),
+            end_value = Math.Round(endValue, 2),
+            start_date = valuationHistory.First().date.ToString("yyyy-MM-dd"),
+            end_date = valuationHistory.Last().date.ToString("yyyy-MM-dd")
+        },
+
+        performance = new
+        {
+            total_pnl = Math.Round(totalPnL, 2),
+            total_return_percent = Math.Round(totalReturn, 2),
+
+            best_day = bestDay != null ? new
+            {
+                date = bestDay.date,
+                change = Math.Round(bestDay.daily_change_percent, 2),
+                change_percent = Math.Round(bestDay.daily_change_percent, 2)
+            } : null,
+            worst_day = worstDay != null ? new
+            {
+                date = worstDay.date,
+                change = Math.Round(worstDay.daily_change_percent, 2),
+                change_percent = Math.Round(worstDay.daily_change_percent, 2)
+            } : null,
+
+            max_drawdown = new
+            {
+                percent = Math.Round(maxDrawdown, 2),
+                from_date = dradownStartDate?.ToString("yyyy-MM-dd"),
+                to_date = drawdownEndDate?.ToString("yyyy-MM-dd")
+            }
+        }
+    }
+
+    );
+})
+.WithName("GetPortfolioPerformance")
+.WithTags("Portfolios")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound);
+
 
 app.Run();
 

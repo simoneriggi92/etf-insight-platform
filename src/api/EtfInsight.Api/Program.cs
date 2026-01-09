@@ -777,7 +777,7 @@ app.MapGet("/api/portfolios/{portfolioId:int}/performance", async (
     var totalPnL = endValue - netInvested;
 
     // Total Return % = (end value - net invested) / net invested * 100
-    var totalReturn = netInvested != 0 ? (totalPnL / netInvested) * 100 : 0;
+    decimal totalReturn = netInvested != 0 ? (totalPnL / netInvested) * 100 : 0m;
 
     // Find best and worst days
     var dailyChanges = new List<dynamic>();
@@ -862,13 +862,13 @@ app.MapGet("/api/portfolios/{portfolioId:int}/performance", async (
             best_day = bestDay != null ? new
             {
                 date = bestDay.date,
-                change = Math.Round(bestDay.daily_change_percent, 2),
+                change = Math.Round(bestDay.daily_change, 2),
                 change_percent = Math.Round(bestDay.daily_change_percent, 2)
             } : null,
             worst_day = worstDay != null ? new
             {
                 date = worstDay.date,
-                change = Math.Round(worstDay.daily_change_percent, 2),
+                change = Math.Round(worstDay.daily_change, 2),
                 change_percent = Math.Round(worstDay.daily_change_percent, 2)
             } : null,
 
@@ -884,6 +884,140 @@ app.MapGet("/api/portfolios/{portfolioId:int}/performance", async (
     );
 })
 .WithName("GetPortfolioPerformance")
+.WithTags("Portfolios")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound);
+
+
+// Get portfolio dashboard summary
+
+app.MapGet("/api/portfolios/{portfolioId:int}/dashboard", async (
+    int portfolioId,
+    IDbConnection db) =>
+{
+
+    var portfolioExists = await db.ExecuteScalarAsync<bool>(
+          "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
+          new { Id = portfolioId });
+
+    if (!portfolioExists)
+    {
+        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+    }
+
+    // Get portfolio info
+    var portfolioQuery = @"
+        SELECT id, name, description, base_currency, created_at
+        FROM portfolios
+        WHERE id = @Id";
+
+    var portfolio = await db.QuerySingleAsync(portfolioQuery, new { Id = portfolioId });
+
+    // Get current valuation
+    var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+
+    var holdingsQuery = @"
+        SELECT
+            symbol,
+            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) as total_quantity
+        FROM transactions
+        WHERE portfolio_id = @PortfolioId
+        AND transaction_date <= @Today
+        GROUP BY symbol
+        HAVING SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) > 0";
+
+    var holdings = await db.QueryAsync(holdingsQuery, new
+    {
+        PortfolioId = portfolioId,
+        Today = DateTime.Parse(today)
+    });
+
+    var currentValue = 0m;
+    var holdingDetails = new List<object>();
+
+    foreach (var holding in holdings)
+    {
+        string symbol = (string)holding.symbol;
+        decimal quantity = (decimal)holding.total_quantity;
+
+        var priceQuery = @"
+            SELECT close_price
+            FROM etf_prices
+            WHERE symbol = @Symbol
+                AND price_date <= @Today
+            ORDER BY price_date DESC
+            LIMIT 1
+        ";
+
+        var priceRecord = await db.ExecuteScalarAsync<decimal?>(priceQuery, new
+        {
+            Symbol = symbol,
+            Today = DateTime.Parse(today)
+        });
+
+        if (priceRecord != null)
+        {
+            var value = quantity * priceRecord.Value;
+            currentValue += value;
+
+            holdingDetails.Add(new
+            {
+                symbol,
+                quantity = Math.Round(quantity, 2),
+                price = Math.Round(priceRecord.Value, 2),
+                value = Math.Round(value, 2),
+                allocation_percent = 0.00m // Placeholder, will calculate later
+            });
+        }
+    }
+
+    // Calculate allocation percentages
+    holdingDetails = holdingDetails.Select(h =>
+    {
+        dynamic hDyn = h;
+        var value = (decimal)hDyn.value;
+        return new
+        {
+            symbol = (string)hDyn.symbol,
+            quantity = (decimal)hDyn.quantity,
+            price = (decimal)hDyn.price,
+            value,
+            allocation_percent = currentValue > 0 ? Math.Round((value / currentValue) * 100, 2) : 0
+        };
+    })
+    .OrderByDescending(h => h.value)
+    .ToList<object>();
+
+    // Get total invested amount
+    var totalInvested = await db.ExecuteScalarAsync<decimal>(
+        @"
+        SELECT 
+            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity * price ELSE 0 END) -
+            SUM(CASE WHEN transaction_type = 'SELL' THEN quantity * price ELSE 0 END)
+        FROM transactions
+        WHERE portfolio_id = @PortfolioId",
+        new { PortfolioId = portfolioId });
+
+    var totalPnL = currentValue - totalInvested;
+    var totalReturnPercent = totalInvested != 0 ? (totalPnL / totalInvested) * 100 : 0m;
+
+    return Results.Ok(new
+    {
+        portfolio,
+        summary = new
+        {
+            current_value = Math.Round(currentValue, 2),
+            total_invested = Math.Round(totalInvested, 2),
+            total_pnl = Math.Round(totalPnL, 2),
+            total_return_percent = Math.Round(totalReturnPercent, 2),
+            holdings_count = holdingDetails.Count,
+            as_of_date = today
+        },
+        holdings = holdingDetails
+    });
+
+})
+.WithName("GetPortfolioDashboard")
 .WithTags("Portfolios")
 .Produces<object>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status404NotFound);

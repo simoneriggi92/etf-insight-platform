@@ -24,6 +24,34 @@ builder.Services.AddScoped<IDbConnection>(_ => new Npgsql.NpgsqlConnection(conne
 
 var app = builder.Build();
 
+// Request logging middleware
+app.Use(async (context, next) =>
+{
+    var startTime = DateTime.UtcNow;
+    var requestPath = context.Request.Path;
+    var requestMethod = context.Request.Method;
+
+    try
+    {
+        await next(context);
+
+        var duration = (DateTime.UtcNow - startTime).TotalMilliseconds;
+        var statusCode = context.Response.StatusCode;
+
+        // Log requests
+
+        Console.WriteLine($"[{startTime:yyyy-MM-dd HH:mm:ss}] {requestMethod} {requestPath} -> {statusCode} ({duration:F0}ms)");
+
+    }
+    catch (Exception ex)
+    {
+        var duration = (DateTime.UtcNow - startTime).TotalMilliseconds;
+        Console.WriteLine($"[{startTime:yyyy-MM-dd HH:mm:ss}] {requestMethod} {requestPath} -> ERROR ({duration:F0}ms)");
+        Console.WriteLine($"    Exception: {ex.Message}");
+        throw;
+    }
+});
+
 
 // Configure middleware
 if (app.Environment.IsDevelopment())

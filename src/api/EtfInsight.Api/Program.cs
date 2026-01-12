@@ -84,7 +84,7 @@ app.MapGet("/api/prices/latest", async (string symbol, IDbConnection db) =>
     var latestPrice = await db.QueryFirstOrDefaultAsync(query, new { Symbol = symbol.ToUpper() });
     if (latestPrice == null)
     {
-        return Results.NotFound(new { error = $"No data found for symbol {symbol}" });
+        return Results.NotFound(new ErrorResponse($"No price data found for symbol {symbol}."));
     }
 
     return Results.Ok(latestPrice);
@@ -104,7 +104,7 @@ app.MapGet("/api/prices", async (
 {
     if (string.IsNullOrWhiteSpace(symbol))
     {
-        return Results.BadRequest(new { error = "Symbol parameter is required" });
+        return Results.BadRequest(new ErrorResponse("Symbol parameter is required"));
     }
 
     // Default date range: last 30 days
@@ -133,7 +133,7 @@ app.MapGet("/api/prices", async (
 
     if (!prices.Any())
     {
-        return Results.NotFound(new { error = $"No data found for symbol {symbol} between {fromDate} and {toDate}." });
+        return Results.NotFound(new ErrorResponse($"No data found for symbol {symbol} between {fromDate} and {toDate}."));
     }
 
     return Results.Ok(new
@@ -160,7 +160,7 @@ app.MapGet("/api/prices/stats", async (
 {
     if (string.IsNullOrWhiteSpace(symbol))
     {
-        return Results.BadRequest(new { error = "Symbol parameter is required." });
+        return Results.BadRequest(new ErrorResponse("Symbol parameter is required."));
     }
 
     // Default date range: last 30 days
@@ -197,7 +197,7 @@ app.MapGet("/api/prices/stats", async (
 
     if (stats == null)
     {
-        return Results.NotFound(new { error = $"No data found for symbol {symbol} between {fromDate} and {toDate}." });
+        return Results.NotFound(new ErrorResponse($"No data found for symbol {symbol} between {fromDate} and {toDate}."));
     }
 
     return Results.Ok(new
@@ -222,7 +222,7 @@ app.MapPost("/api/portfolios", async (
 {
     if (string.IsNullOrWhiteSpace(request.Name))
     {
-        return Results.BadRequest(new { error = "Portfolio name is required." });
+        return Results.BadRequest(new ErrorResponse("Portfolio name is required."));
     }
 
     var query = @"
@@ -241,7 +241,7 @@ app.MapPost("/api/portfolios", async (
 })
 .WithName("CreatePortfolio")
 .WithTags("Portfolios")
-.Produces<object>(StatusCodes.Status201Created)
+.Produces<ErrorResponse>(StatusCodes.Status201Created)
 .Produces(StatusCodes.Status400BadRequest);
 
 // Get all portfolios
@@ -277,7 +277,7 @@ app.MapGet("/api/portfolios/{id:int}", async (int id, IDbConnection db) =>
 
     if (portfolio == null)
     {
-        return Results.NotFound(new { error = $"Portfolio with ID {id} not found." });
+        return Results.NotFound(new ErrorResponse($"Portfolio with ID {id} not found."));
     }
 
     // Get transactions summary
@@ -316,7 +316,7 @@ app.MapPost("/api/portfolios/{portfolioId:int}/transactions", async (
 
     if (!portfolioExists)
     {
-        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+        return Results.NotFound(new ErrorResponse($"Portfolio with ID {portfolioId} not found."));
     }
 
     var symbolExists = await db.ExecuteScalarAsync<bool>(
@@ -326,88 +326,58 @@ app.MapPost("/api/portfolios/{portfolioId:int}/transactions", async (
     // Validate transaction date
     if (request.TransactionDate > DateTime.UtcNow)
     {
-        return Results.BadRequest(new
-        {
-            error = "Transaction date cannot be in the future."
-        });
+        return Results.BadRequest(new ErrorResponse("Transaction date cannot be in the future."));
     }
 
     // Validate transaction date not too old (reasonable limit, e.g., 30 years)∏
     if (request.TransactionDate < new DateTime(DateTime.UtcNow.Year - 30, 1, 1))
     {
-        return Results.BadRequest(new
-        {
-            error = "Transaction date must be within the last 30 years."
-        });
+        return Results.BadRequest(new ErrorResponse("Transaction date must be within the last 30 years."));
     }
 
     // Validate quantity reasonably
     if (request.Quantity > 1_000_000)
     {
-        return Results.BadRequest(new
-        {
-            error = "Quantity too large. Maximum allowed is 1,000,000 per transaction."
-        });
+        return Results.BadRequest(new ErrorResponse("Quantity too large. Maximum allowed is 1,000,000 per transaction."));
     }
 
     // Validate price reasonably
     if (request.Price > 100_000)
     {
-        return Results.BadRequest(new
-        {
-            error = "Price too high. Maximum allowed price $100,000 per share."
-        });
+        return Results.BadRequest(new ErrorResponse("Price too high. Maximum allowed price $100,000 per share."));
     }
 
     // Validate price not suspiciously low
     if (request.Price < 0.01m)
     {
-        return Results.BadRequest(new
-        {
-            error = "Price too low. Minimum allowed price is $0.01 per share."
-        });
+        return Results.BadRequest(new ErrorResponse("Price too low. Minimum allowed price is $0.01 per share."));
     }
 
     // Validate symbol existence
     if (!symbolExists)
     {
-        return Results.BadRequest(new
-        {
-            error = $"Symbol {request.Symbol} is not found in price database."
-        });
+        return Results.BadRequest(new ErrorResponse($"Symbol {request.Symbol} is not found in price database."));
     }
 
     // Validate transaction data 
     if (string.IsNullOrWhiteSpace(request.Symbol))
     {
-        return Results.BadRequest(new
-        {
-            error = "Symbol is required."
-        });
+        return Results.BadRequest(new ErrorResponse("Symbol is required."));
     }
 
     if (!new[] { "BUY", "SELL" }.Contains(request.TransactionType.ToUpper()))
     {
-        return Results.BadRequest(new
-        {
-            error = "TransactionType must be either 'BUY' or 'SELL'."
-        });
+        return Results.BadRequest(new ErrorResponse("TransactionType must be either 'BUY' or 'SELL'."));
     }
 
     if (request.Quantity <= 0)
     {
-        return Results.BadRequest(new
-        {
-            error = "Quantity must be positive."
-        });
+        return Results.BadRequest(new ErrorResponse("Quantity must be positive."));
     }
 
     if (request.Price <= 0)
     {
-        return Results.BadRequest(new
-        {
-            error = "Price must be positive."
-        });
+        return Results.BadRequest(new ErrorResponse("Price must be positive."));
     }
 
     // Validate: can't over sell
@@ -435,10 +405,7 @@ app.MapPost("/api/portfolios/{portfolioId:int}/transactions", async (
 
         if (request.Quantity > currentHoldings)
         {
-            return Results.BadRequest(new
-            {
-                error = $"Cannot sell {request.Quantity} shares of {request.Symbol}. Only {Math.Round(currentHoldings, 2)} shares available on {parsedTransactionDate:yyyy-MM-dd}."
-            });
+            return Results.BadRequest(new ErrorResponse($"Cannot sell {request.Quantity} shares of {request.Symbol}. Only {Math.Round(currentHoldings, 2)} shares available on {parsedTransactionDate:yyyy-MM-dd}."));
         }
     }
 
@@ -481,7 +448,7 @@ app.MapGet("/api/portfolios/{portfolioId:int}/transactions", async (int portfoli
 
     if (!portfolioExists)
     {
-        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+        return Results.NotFound(new ErrorResponse($"Portfolio with ID {portfolioId} not found."));
     }
 
     var query = @"
@@ -517,7 +484,7 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
 
     if (!portfolioExists)
     {
-        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+        return Results.NotFound(new ErrorResponse($"Portfolio with ID {portfolioId} not found."));
     }
 
     // Default valuation date: today
@@ -528,7 +495,7 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
     // Validate date format
     if (!DateTime.TryParse(valuationDate, out DateTime parsedDate))
     {
-        return Results.BadRequest(new { error = "Invalid date format. Use YYYY-MM-DD." });
+        return Results.BadRequest(new ErrorResponse("Invalid date format. Use YYYY-MM-DD."));
     }
 
     // Calculate holdings as of the valuation date
@@ -638,7 +605,7 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation/history", async (
 
     if (!portfolioExists)
     {
-        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+        return Results.NotFound(new ErrorResponse($"Portfolio with ID {portfolioId} not found."));
     }
 
     // Default date range: last 30 days
@@ -759,7 +726,7 @@ app.MapGet("/api/portfolios/{portfolioId:int}/performance", async (
 
     if (!portfolioExists)
     {
-        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+        return Results.NotFound(new ErrorResponse($"Portfolio with ID {portfolioId} not found."));
     }
 
     // Default range: inception to today
@@ -996,7 +963,7 @@ app.MapGet("/api/portfolios/{portfolioId:int}/dashboard", async (
 
     if (!portfolioExists)
     {
-        return Results.NotFound(new { error = $"Portfolio with ID {portfolioId} not found." });
+        return Results.NotFound(new ErrorResponse($"Portfolio with ID {portfolioId} not found."));
     }
 
     // Get portfolio info
@@ -1119,6 +1086,26 @@ app.MapGet("/api/portfolios/{portfolioId:int}/dashboard", async (
 
 app.Run();
 
+// Standardized error response DTOs
+record ErrorResponse
+(
+    string Error,
+    string? Details = null,
+    DateTime Timestamp = default)
+{
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}
+
+record ValidationErrorResponse
+(
+    string Error,
+    Dictionary<string, string[]> ValidationErrors,
+    DateTime Timestamp = default)
+{
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}
+
+// Request DTOs
 record PortfolioCreateRequest
 (
     string Name,

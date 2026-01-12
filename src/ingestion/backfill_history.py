@@ -76,7 +76,7 @@ def save_historical_data(symbol: str, data: dict, data_range: str):
 
 
 def main():
-    symbols = ["SPY", "QQQ", "VTI"]  # Example ETF symbols
+    symbols = ["SPY", "QQQ", "VTI", "EUNL.DE", "EUNA.DE", "IS3N.DE"]
 
     # Fetch the last 2 yesars of data
     start_date = (datetime.now() - timedelta(days=730)).strftime("%Y-%m-%d")  # ~2 years

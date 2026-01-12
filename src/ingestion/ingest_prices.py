@@ -57,9 +57,9 @@ def save_raw_response(symbol: str, data: dict):
 
 def main():
     etf_symbols = [
-        "SPY",  # SPDR S&P 500 ETF Trust
-        "QQQ",  # Invesco QQQ Trust
-        "VTI",  # Vanguard Total Stock Market ETF
+        "EUNL.DE",  # iShares Core MSCI World UCITS ETF (DE)
+        "EUNA.DE",  # iShares Core MSCI World UCITS ETF (IE)
+        "IS3N.DE",  # iShares MSCI EM UCITS ETF
     ]
 
     for i, symbol in enumerate(etf_symbols):

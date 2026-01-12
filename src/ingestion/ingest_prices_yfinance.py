@@ -38,7 +38,7 @@ def save_raw_response(symbol: str, data: dict):
 
 
 def main():
-    symbols = ["SPY", "QQQ", "VTI"]
+    symbols = ["SPY", "QQQ", "VTI", "EUNL", "EUNA", "IS3N"]
 
     for symbol in symbols:
         try:

@@ -323,31 +323,125 @@ app.MapPost("/api/portfolios/{portfolioId:int}/transactions", async (
         "SELECT EXISTS(SELECT 1 FROM etf_prices WHERE symbol = @Symbol)",
         new { Symbol = request.Symbol.ToUpper() });
 
+    // Validate transaction date
+    if (request.TransactionDate > DateTime.UtcNow)
+    {
+        return Results.BadRequest(new
+        {
+            error = "Transaction date cannot be in the future."
+        });
+    }
+
+    // Validate transaction date not too old (reasonable limit, e.g., 30 years)∏
+    if (request.TransactionDate < new DateTime(DateTime.UtcNow.Year - 30, 1, 1))
+    {
+        return Results.BadRequest(new
+        {
+            error = "Transaction date must be within the last 30 years."
+        });
+    }
+
+    // Validate quantity reasonably
+    if (request.Quantity > 1_000_000)
+    {
+        return Results.BadRequest(new
+        {
+            error = "Quantity too large. Maximum allowed is 1,000,000 per transaction."
+        });
+    }
+
+    // Validate price reasonably
+    if (request.Price > 100_000)
+    {
+        return Results.BadRequest(new
+        {
+            error = "Price too high. Maximum allowed price $100,000 per share."
+        });
+    }
+
+    // Validate price not suspiciously low
+    if (request.Price < 0.01m)
+    {
+        return Results.BadRequest(new
+        {
+            error = "Price too low. Minimum allowed price is $0.01 per share."
+        });
+    }
+
+    // Validate symbol existence
     if (!symbolExists)
     {
-        return Results.BadRequest(new { error = $"Symbol {request.Symbol} is not found in price database." });
+        return Results.BadRequest(new
+        {
+            error = $"Symbol {request.Symbol} is not found in price database."
+        });
     }
 
     // Validate transaction data 
     if (string.IsNullOrWhiteSpace(request.Symbol))
     {
-        return Results.BadRequest(new { error = "Symbol is required." });
+        return Results.BadRequest(new
+        {
+            error = "Symbol is required."
+        });
     }
 
     if (!new[] { "BUY", "SELL" }.Contains(request.TransactionType.ToUpper()))
     {
-        return Results.BadRequest(new { error = "TransactionType must be either 'BUY' or 'SELL'." });
+        return Results.BadRequest(new
+        {
+            error = "TransactionType must be either 'BUY' or 'SELL'."
+        });
     }
 
     if (request.Quantity <= 0)
     {
-        return Results.BadRequest(new { error = "Quantity must be positive." });
+        return Results.BadRequest(new
+        {
+            error = "Quantity must be positive."
+        });
     }
 
     if (request.Price <= 0)
     {
-        return Results.BadRequest(new { error = "Price must be positive." });
+        return Results.BadRequest(new
+        {
+            error = "Price must be positive."
+        });
     }
+
+    // Validate: can't over sell
+    if (request.TransactionType.ToUpper() == "SELL")
+    {
+        var parsedTransactionDate = DateTime.TryParse(request.TransactionDate.ToString(), out DateTime transactionDate)
+            ? transactionDate
+            : DateTime.UtcNow;
+
+        // Get current holdings for the symbol
+        var currentHoldings = await db.ExecuteScalarAsync<decimal>(
+            @"
+            SELECT 
+                COALESCE(SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END), 0)
+            FROM transactions
+            WHERE portfolio_id = @PortfolioId
+                AND symbol = @Symbol
+                AND transaction_date <= @TransactionDate",
+            new
+            {
+                PortfolioId = portfolioId,
+                Symbol = request.Symbol.ToUpper(),
+                TransactionDate = parsedTransactionDate
+            });
+
+        if (request.Quantity > currentHoldings)
+        {
+            return Results.BadRequest(new
+            {
+                error = $"Cannot sell {request.Quantity} shares of {request.Symbol}. Only {Math.Round(currentHoldings, 2)} shares available on {parsedTransactionDate:yyyy-MM-dd}."
+            });
+        }
+    }
+
 
     // Insert transaction
     var query = @"

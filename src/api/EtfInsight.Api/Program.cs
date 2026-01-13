@@ -781,6 +781,12 @@ app.MapGet("/api/portfolios/{portfolioId:int}/performance", async (
         ? dateOnly.ToString("yyyy-MM-dd")
         : firstTransactionDateResult.ToString() ?? string.Empty;
 
+    // if the fromDateStr is provided and is earlier than firstTransactionDate, use firstTransactionDate
+    if (!string.IsNullOrWhiteSpace(from) && DateTime.Parse(from) < DateTime.Parse(firstTransactionDate))
+    {
+        from = firstTransactionDate;
+    }
+
     var fromDateStr = string.IsNullOrWhiteSpace(from) ?
         firstTransactionDate
         : from;

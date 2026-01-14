@@ -1,6 +1,7 @@
 using Npgsql;
 using Dapper;
 using System.Data;
+using EtfInsight.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +22,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? "Host=localhost;Port=5432;Database=etfinsight;Username=etfinsight;Password=devpassword123";
 
 builder.Services.AddScoped<IDbConnection>(_ => new Npgsql.NpgsqlConnection(connectionString));
+builder.Services.AddScoped<IFxRateService, FxRateService>();
 
 var app = builder.Build();
 
@@ -496,127 +498,6 @@ app.MapGet("/api/portfolios/{portfolioId:int}/transactions", async (int portfoli
 .WithName("GetPortfolioTransactions")
 .WithTags("Portfolios")
 .Produces<object>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status404NotFound);
-
-
-app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
-    int portfolioId,
-    string? date,
-    IDbConnection db) =>
-{
-
-    // Validate portfolio existence
-    var portfolioExists = await db.ExecuteScalarAsync<bool>(
-        "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
-        new { Id = portfolioId });
-
-    if (!portfolioExists)
-    {
-        return Results.NotFound(new ErrorResponse($"Portfolio with ID {portfolioId} not found."));
-    }
-
-    // Default valuation date: today
-    var valuationDate = string.IsNullOrWhiteSpace(date) ?
-        DateTime.UtcNow.Date.ToString("yyyy-MM-dd")
-        : date;
-
-    // Validate date format
-    if (!DateTime.TryParse(valuationDate, out DateTime parsedDate))
-    {
-        return Results.BadRequest(new ErrorResponse("Invalid date format. Use YYYY-MM-DD."));
-    }
-
-    // Calculate holdings as of the valuation date
-    var holdingsQuery = @"
-        SELECT
-            symbol,
-            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) as total_quantity
-        FROM transactions
-        WHERE portfolio_id = @PortfolioId
-        AND transaction_date <= @ValuationDate
-        GROUP BY symbol
-        HAVING SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) > 0
-    ";
-
-    var holdings = await db.QueryAsync(holdingsQuery, new
-    {
-        PortfolioId = portfolioId,
-        ValuationDate = parsedDate
-    });
-
-    if (!holdings.Any())
-    {
-        return Results.Ok(new
-        {
-            portfolio_id = portfolioId,
-            valuation_date = parsedDate.Date.ToString("yyyy-MM-dd"),
-            total_value = 0.00m,
-            message = "No holdings in the portfolio as of the specified date.",
-            holdings = new List<object>()
-        });
-    }
-
-    // Get prices for each holding on valuation date
-    var valuationDetails = new List<object>();
-    decimal totalValue = 0;
-
-    foreach (var holding in holdings)
-    {
-        string symbol = (string)holding.symbol;
-        decimal quantity = (decimal)holding.total_quantity;
-
-        var priceQuery = @"
-            SELECT close_price
-            FROM etf_prices
-            WHERE symbol = @Symbol
-            AND price_date <= @ValuationDate
-            ORDER BY price_date DESC
-            LIMIT 1
-        ";
-
-        var priceRecord = await db.ExecuteScalarAsync<decimal?>(priceQuery, new
-        {
-            Symbol = symbol,
-            ValuationDate = parsedDate
-        });
-
-        if (priceRecord == null)
-        {
-            valuationDetails.Add(new
-            {
-                symbol,
-                quantity,
-                price = (decimal?)null,
-                value = (decimal?)null,
-                note = "No price data available on or before valuation date."
-            });
-            continue;
-        }
-
-        var value = quantity * priceRecord.Value;
-        totalValue += value;
-
-        valuationDetails.Add(new
-        {
-            symbol,
-            quantity,
-            price = Math.Round(priceRecord.Value, 2),
-            value = Math.Round(value, 2)
-        });
-    }
-
-    return Results.Ok(new
-    {
-        portfolio_id = portfolioId,
-        valuation_date = parsedDate.Date.ToString("yyyy-MM-dd"),
-        total_value = Math.Round(totalValue, 2),
-        details = valuationDetails
-    });
-})
-.WithName("GetPortfolioValuation")
-.WithTags("Portfolios")
-.Produces<object>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status400BadRequest)
 .Produces(StatusCodes.Status404NotFound);
 
 // Get portfolio valuation history over date range 
@@ -1115,6 +996,166 @@ app.MapGet("/api/portfolios/{portfolioId:int}/dashboard", async (
 .WithName("GetPortfolioDashboard")
 .WithTags("Portfolios")
 .Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound);
+
+app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
+    int portfolioId,
+    string? date,
+    string? currency,
+    IDbConnection db,
+    IFxRateService fxRateService) =>
+{
+    var portfolioExists = await db.ExecuteScalarAsync<bool>(
+          "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
+          new { Id = portfolioId });
+
+    if (!portfolioExists)
+    {
+        return Results.NotFound(new ErrorResponse($"Portfolio with ID {portfolioId} not found."));
+    }
+
+    var valuationDate = string.IsNullOrWhiteSpace(date) ?
+        DateTime.UtcNow.Date.ToString("yyyy-MM-dd")
+        : date;
+
+    // Validate date format
+    if (!DateTime.TryParse(valuationDate, out DateTime parsedDate))
+    {
+        return Results.BadRequest(new ErrorResponse("Invalid date format. Use YYYY-MM-DD."));
+    }
+
+    // Validate currency code
+    var targetCurrency = string.IsNullOrWhiteSpace(currency)
+    ? "USD"
+    : currency.ToUpper();
+
+
+    var holdingsQuery = @"
+        SELECT
+            symbol,
+            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) as total_quantity
+        FROM transactions
+        WHERE portfolio_id = @PortfolioId
+        AND transaction_date <= @ValuationDate
+        GROUP BY symbol
+        HAVING SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) > 0
+    ";
+
+    var holdings = await db.QueryAsync(holdingsQuery, new
+    {
+        PortfolioId = portfolioId,
+        ValuationDate = parsedDate
+    });
+
+    if (!holdings.Any())
+    {
+        return Results.Ok(new
+        {
+            portfolio_id = portfolioId,
+            valuation_date = parsedDate.Date.ToString("yyyy-MM-dd"),
+            target_currency = targetCurrency,
+            total_value = 0m,
+            message = "No holdings in the portfolio as of the specified date.",
+            holdings = new List<object>()
+        });
+    }
+
+    // Get prices and convert to target currency
+    var valuationDetails = new List<object>();
+    decimal totalValue = 0;
+    List<string> conversionWarnings = new List<string>();
+
+    foreach (var holding in holdings)
+    {
+        var symbol = (string)holding.symbol;
+        var quantity = (decimal)holding.total_quantity;
+
+        var priceQuery = @"
+            SELECT close_price
+            FROM etf_prices
+            WHERE symbol = @Symbol
+            AND price_date <= @ValuationDate
+            ORDER BY price_date DESC
+            LIMIT 1
+        ";
+
+        var priceUsd = await db.ExecuteScalarAsync<decimal?>(priceQuery, new
+        {
+            Symbol = symbol,
+            ValuationDate = parsedDate
+        });
+
+        if (priceUsd == null)
+        {
+            valuationDetails.Add(new
+            {
+                symbol,
+                quantity,
+                price_usd = (decimal?)null,
+                price = (decimal?)null,
+                value = (decimal?)null,
+                note = "No price data available on or before valuation date."
+            });
+            continue;
+        }
+
+        decimal priceInTargetCurrency;
+        try
+        {
+            priceInTargetCurrency = await fxRateService.ConvertAmountAsync(
+                priceUsd.Value,
+                "USD",
+                targetCurrency,
+                parsedDate);
+        }
+        catch (InvalidOperationException ex)
+        {
+            conversionWarnings.Add($"Failed to convert price for {symbol} from USD to {targetCurrency}: {ex.Message}");
+            priceInTargetCurrency = priceUsd.Value; // Fallback to USD price
+        }
+
+        var value = quantity * priceInTargetCurrency;
+        totalValue += value;
+
+        valuationDetails.Add(new
+        {
+            symbol,
+            quantity,
+            price_usd = Math.Round(priceUsd.Value, 2),
+            price = Math.Round(priceInTargetCurrency, 2),
+            value = Math.Round(value, 2)
+        });
+    }
+
+    var response = new
+    {
+        portfolio_id = portfolioId,
+        valuation_date = parsedDate.Date.ToString("yyyy-MM-dd"),
+        currency = targetCurrency,
+        total_value = Math.Round(totalValue, 2),
+        holdings = valuationDetails
+    };
+
+    // Include conversion warnings if any
+    if (conversionWarnings.Any())
+    {
+        return Results.Ok(new
+        {
+            response.portfolio_id,
+            response.valuation_date,
+            response.currency,
+            response.total_value,
+            response.holdings,
+            warnings = conversionWarnings
+        });
+    }
+
+    return Results.Ok(response);
+})
+.WithName("GetPortfolioValuationWithCurrency")
+.WithTags("Portfolios")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
 .Produces(StatusCodes.Status404NotFound);
 
 

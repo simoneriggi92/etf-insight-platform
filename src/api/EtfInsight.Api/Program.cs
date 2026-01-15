@@ -498,7 +498,7 @@ app.MapGet("/api/portfolios/{portfolioId:int}/transactions", async (int portfoli
     }
 
     var query = @"
-    SELECT id, portfolio_id, symbol, transaction_type, quantity, price, transaction_date, notes, created_at
+    SELECT id, portfolio_id, symbol, transaction_type, quantity, price, transaction_date, notes, created_at, transaction_currency
     FROM transactions
     WHERE portfolio_id = @PortfolioId
     ORDER BY transaction_date DESC, created_at DESC";

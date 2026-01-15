@@ -36,3 +36,4 @@ CREATE INDEX IF NOT EXISTS idx_transactions_portfolio_date ON transactions(portf
 -- Composite index for common queries
 CREATE INDEX IF NOT EXISTS idx_transactions_portfolio_symbol_date 
 ON transactions(portfolio_id, symbol, transaction_date);
+

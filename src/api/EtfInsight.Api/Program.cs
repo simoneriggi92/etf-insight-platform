@@ -353,6 +353,19 @@ app.MapPost("/api/portfolios/{portfolioId:int}/transactions", async (
         "SELECT EXISTS(SELECT 1 FROM etf_prices WHERE symbol = @Symbol)",
         new { Symbol = request.Symbol.ToUpper() });
 
+    // Validate transaction currency
+    if (!string.IsNullOrWhiteSpace(request.Currency))
+    {
+        var currencyExists = await db.ExecuteScalarAsync<bool>(
+            "SELECT EXISTS(SELECT 1 FROM fx_rates WHERE from_currency = @Currency OR to_currency = @Currency LIMIT 1)",
+            new { Currency = request.Currency.ToUpper() });
+
+        if (!currencyExists)
+        {
+            return Results.BadRequest(new ErrorResponse($"Currency {request.Currency} is not supported."));
+        }
+    }
+
     // Validate transaction date
     if (request.TransactionDate > DateTime.UtcNow)
     {
@@ -442,9 +455,9 @@ app.MapPost("/api/portfolios/{portfolioId:int}/transactions", async (
 
     // Insert transaction
     var query = @"
-    INSERT INTO transactions (portfolio_id, symbol, transaction_type, quantity, price, transaction_date, notes)
-    VALUES (@PortfolioId, @Symbol, @TransactionType, @Quantity, @Price, @TransactionDate, @Notes)
-    RETURNING id, portfolio_id, symbol, transaction_type, quantity, price, transaction_date, notes, created_at";
+    INSERT INTO transactions (portfolio_id, symbol, transaction_type, quantity, price, transaction_date, notes, transaction_currency)
+    VALUES (@PortfolioId, @Symbol, @TransactionType, @Quantity, @Price, @TransactionDate, @Notes, @TransactionCurrency)
+    RETURNING id, portfolio_id, symbol, transaction_type, quantity, price, transaction_date, notes, created_at, transaction_currency";
 
     var transaction = await db.QuerySingleAsync(query, new
     {
@@ -454,7 +467,10 @@ app.MapPost("/api/portfolios/{portfolioId:int}/transactions", async (
         Quantity = request.Quantity,
         Price = request.Price,
         TransactionDate = request.TransactionDate,
-        Notes = request.Notes ?? string.Empty
+        Notes = request.Notes ?? string.Empty,
+        TransactionCurrency = string.IsNullOrWhiteSpace(request.Currency)
+        ? "USD"
+         : request.Currency.ToUpper()
     });
 
     return Results.Created(
@@ -1194,6 +1210,7 @@ record TransactionCreateRequest
     string TransactionType,
     decimal Quantity,
     decimal Price,
+    string? Currency,
     DateTime TransactionDate,
     string? Notes
 );

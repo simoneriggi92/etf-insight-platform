@@ -50,6 +50,82 @@ GET /api/prices/stats?symbol={SYMBOL}&from={DATE}&to={DATE}
 
 Returns min/max/avg prices, trading days, volume statistics.
 
+### Create portfolio
+
+```http
+POST /api/portfolios?name={NAME}&description={DESCRIPTION}&base_currency={CCY}
+```
+
+Parameters:
+
+- `name` (required): portfolio name
+- `description` (optional): Portfolio description
+- `base_currency` (optional): portfolio currency
+
+### Get portfolio
+
+```http
+GET /api/portfolios/{id}
+```
+
+Returns the portfolio details
+
+### Get all portfolios
+
+```http
+GET /api/portfolios
+```
+
+Returns the details for all portfolios
+
+### Add transactions to portfolio
+
+```http
+POST /api/portfolios/{id}/transactions?symbol={SYMBOL}&transaction_type={TTYPE}&quantity={QTY}&price={PRICE}&currency="{CCY}"&transaction_date={TDATE}&notes="{NOTES}"
+```
+
+Parameters:
+
+- `symbol` (required): ETF symbol
+- `transaction_type` (required): the transaction type (BUY/SELL)
+- `quantity` (required): ETF symbol shares quantity
+- `price` (required): ETF symbol shares price per unit
+- `currency` (optional): price currency
+- `transaction_date` (optional): the date of transaction
+- `notes` (optional): the notes of transaction
+
+### Get portfolio valuation
+
+```http
+GET /api/portfolios/{id}/valaution?date={DATE}&currency={CCY}
+```
+
+Returns the portfolio valuation in a specific currency
+
+### Get portfolio valuation history
+
+```http
+GET /api/portfolios/{id}/valaution?from={DATE}&to={DATE}
+```
+
+Returns the portfolio valuation history points of a specific time range
+
+### Get portfolio performance
+
+```http
+GET /api/portfolios/{id}/performance
+```
+
+Returns the portfolio performance details
+
+### Get portfolio summary dashboard
+
+```http
+GET /api/portfolios/{id}/dashboard
+```
+
+Returns the portfolio summary details
+
 ### Interactive Documentation
 
 Visit `http://localhost:5076/swagger` when API is running.

@@ -1049,11 +1049,12 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
     var holdingsQuery = @"
         SELECT
             symbol,
-            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) as total_quantity
+            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) as total_quantity,
+            transaction_currency
         FROM transactions
         WHERE portfolio_id = @PortfolioId
         AND transaction_date <= @ValuationDate
-        GROUP BY symbol
+        GROUP BY symbol, transaction_currency
         HAVING SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) > 0
     ";
 
@@ -1120,13 +1121,13 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
         {
             priceInTargetCurrency = await fxRateService.ConvertAmountAsync(
                 priceUsd.Value,
-                "USD",
+                holding.transaction_currency,
                 targetCurrency,
                 parsedDate);
         }
         catch (InvalidOperationException ex)
         {
-            conversionWarnings.Add($"Failed to convert price for {symbol} from USD to {targetCurrency}: {ex.Message}");
+            conversionWarnings.Add($"Failed to convert price for {symbol} from {holding.transaction_currency} to {targetCurrency}: {ex.Message}");
             priceInTargetCurrency = priceUsd.Value; // Fallback to USD price
         }
 

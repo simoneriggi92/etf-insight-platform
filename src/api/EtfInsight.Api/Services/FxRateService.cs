@@ -64,7 +64,7 @@ namespace EtfInsight.Api.Services
                     WHERE from_currency = @FromCurrency 
                         AND to_currency = @ToCurrency 
                         AND rate_date <= @Date
-                    ORDER BY date DESC
+                    ORDER BY rate_date DESC
                     LIMIT 1",
                 new { FromCurrency = fromCurrency, ToCurrency = toCurrency, Date = date });
 

@@ -109,6 +109,58 @@ def fetch_ecb_rates(currency_pair: str, start_date: str, end_date: str) -> List[
         return []
 
 
+def calculate_cross_rate():
+    """Calculate USD/GBP rate from EUR/USD and EUR/GBP rates"""
+
+    # USD/GBP = (EUR/GBP) / (EUR/USD)
+    query = """
+        INSERT INTO fx_rates (rate_date, from_currency, to_currency, rate, source)
+        SELECT
+            eur_gbp.rate_date,
+            'USD' AS from_currency,
+            'GBP' AS to_currency,
+            (eur_gbp.rate / eur_usd.rate) AS rate,
+            'ECB_calculated' AS source
+        FROM fx_rates AS eur_gbp
+        JOIN fx_rates eur_usd ON eur_gbp.rate_date = eur_usd.rate_date
+        WHERE 
+            eur_gbp.from_currency = 'EUR' AND eur_gbp.to_currency = 'GBP'
+            AND eur_usd.from_currency = 'EUR' AND eur_usd.to_currency = 'USD'
+        ON CONFLICT (rate_date, from_currency, to_currency) DO NOTHING
+    """
+
+    # Also create inverse GBP/USD
+    inverse_query = """
+        INSERT INTO fx_rates (rate_date, from_currency, to_currency, rate, source)
+        SELECT
+            rate_date,
+            'GBP' AS from_currency,
+            'USD' AS to_currency,
+            (1.0 / rate) AS rate,
+            'ECB_calculated_inverse' AS source
+        FROM fx_rates
+        WHERE from_currency = 'USD' AND to_currency = 'GBP'
+            AND source = 'ECB_calculated'
+        ON CONFLICT (rate_date, from_currency, to_currency) DO NOTHING
+    """
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(query)
+        cursor.execute(inverse_query)
+        conn.commit()
+    except Exception as e:
+        print(f"Error calculating cross rates: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
+    print("Calculated cross rates USD/GBP and GBP/USD.")
+
+
 def insert_fx_rates(rates: List[Dict]) -> int:
     """
     Insert FX rates into the database
@@ -178,6 +230,7 @@ def main():
     currency_pairs = [
         "EUR/USD",  # Euro to US Dollar
         "EUR/GBP",  # Euro to British Pound
+        "USD/GBP",
     ]
 
     total_fetched = 0
@@ -200,6 +253,8 @@ def main():
 
         # Rate limiting: wait 3 seconds between requests
         time.sleep(3)
+
+    calculate_cross_rate()
 
     print(f"Backfill complete:")
     print(f"  Total rates fetched: {total_fetched}")

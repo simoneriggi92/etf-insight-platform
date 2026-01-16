@@ -48,7 +48,8 @@ namespace EtfInsight.Api.Services
                 FROM fx_rates 
                 WHERE from_currency = @FromCurrency 
                 AND to_currency = @ToCurrency 
-                AND rate_date = @Date",
+                AND rate_date = @Date
+                LIMIT 1",
                 new { FromCurrency = fromCurrency, ToCurrency = toCurrency, Date = date });
 
             if (directRateQuery.HasValue)
@@ -73,17 +74,24 @@ namespace EtfInsight.Api.Services
                 return carryForwardRate.Value;
             }
 
-            // Try cross-rate via USD (if neither from nor to currency is USD)
-            if (!fromCurrency.Equals("USD", StringComparison.OrdinalIgnoreCase) &&
-                !toCurrency.Equals("USD", StringComparison.OrdinalIgnoreCase))
+            // Try cross-rate via EUR (most common base currency)
+            if (!fromCurrency.Equals("EUR", StringComparison.OrdinalIgnoreCase) && !toCurrency.Equals("EUR", StringComparison.OrdinalIgnoreCase))
             {
-                var rateFromToUsd = await GetRateAsync(fromCurrency, "USD", date);
-                var rateUsdToTarget = await GetRateAsync("USD", toCurrency, date);
+                var fromToEur = await GetRateAsync(fromCurrency, "EUR", date);
+                var eurToTarget = await GetRateAsync("EUR", toCurrency, date);
 
-                if (rateFromToUsd.HasValue && rateUsdToTarget.HasValue)
-                {
-                    return rateFromToUsd.Value * rateUsdToTarget.Value;
-                }
+                if (fromToEur.HasValue && eurToTarget.HasValue)
+                    return fromToEur.Value * eurToTarget.Value;
+            }
+
+            // Try cross-rate via USD (alternative pivot)
+            if (!fromCurrency.Equals("USD", StringComparison.OrdinalIgnoreCase) && !toCurrency.Equals("USD", StringComparison.OrdinalIgnoreCase))
+            {
+                var fromToUsd = await GetRateAsync(fromCurrency, "USD", date);
+                var usdToTarget = await GetRateAsync("USD", toCurrency, date);
+
+                if (fromToUsd.HasValue && usdToTarget.HasValue)
+                    return fromToUsd.Value * usdToTarget.Value;
             }
 
             return null; // Rate not found

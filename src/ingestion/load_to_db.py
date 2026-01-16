@@ -44,6 +44,7 @@ def parse_price_file(filepath: Path) -> List[Dict]:
             "low_price": values.get("Low"),
             "close_price": values.get("Close"),
             "volume": int(values.get("Volume", 0)),
+            "currency": values.get("Currency", "USD"),
         }
         parsed.append(record)
 
@@ -59,8 +60,8 @@ def insert_prices(records: List[Dict]) -> int:
     cur = conn.cursor()
 
     insert_query = """
-        INSERT INTO etf_prices (symbol, price_date, open_price, high_price, low_price, close_price, volume)
-        VALUES (%(symbol)s, %(price_date)s, %(open_price)s, %(high_price)s, %(low_price)s, %(close_price)s, %(volume)s)
+        INSERT INTO etf_prices (symbol, price_date, open_price, high_price, low_price, close_price, volume, currency)
+        VALUES (%(symbol)s, %(price_date)s, %(open_price)s, %(high_price)s, %(low_price)s, %(close_price)s, %(volume)s, %(currency)s)
         ON CONFLICT (symbol, price_date) DO NOTHING
     """
 

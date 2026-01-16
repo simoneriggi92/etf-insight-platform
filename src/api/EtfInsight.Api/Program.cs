@@ -1088,7 +1088,7 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
         var quantity = (decimal)holding.total_quantity;
 
         var priceQuery = @"
-            SELECT close_price
+            SELECT close_price, currency
             FROM etf_prices
             WHERE symbol = @Symbol
             AND price_date <= @ValuationDate
@@ -1096,7 +1096,7 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
             LIMIT 1
         ";
 
-        var priceUsd = await db.ExecuteScalarAsync<decimal?>(priceQuery, new
+        var priceUsd = await db.QueryFirstOrDefaultAsync<(decimal close_price, string currency)?>(priceQuery, new
         {
             Symbol = symbol,
             ValuationDate = parsedDate
@@ -1117,18 +1117,27 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
         }
 
         decimal priceInTargetCurrency;
-        try
+
+        // If the holding price currency matches target currency, no conversion needed
+        if (targetCurrency.Equals(priceUsd.Value.currency, StringComparison.OrdinalIgnoreCase))
         {
-            priceInTargetCurrency = await fxRateService.ConvertAmountAsync(
-                priceUsd.Value,
-                holding.transaction_currency,
-                targetCurrency,
-                parsedDate);
+            priceInTargetCurrency = priceUsd.Value.close_price;
         }
-        catch (InvalidOperationException ex)
+        else
         {
-            conversionWarnings.Add($"Failed to convert price for {symbol} from {holding.transaction_currency} to {targetCurrency}: {ex.Message}");
-            priceInTargetCurrency = priceUsd.Value; // Fallback to USD price
+            try
+            {
+                priceInTargetCurrency = await fxRateService.ConvertAmountAsync(
+                    priceUsd.Value.close_price,
+                    holding.transaction_currency,
+                    targetCurrency,
+                    parsedDate);
+            }
+            catch (InvalidOperationException ex)
+            {
+                conversionWarnings.Add($"Failed to convert price for {symbol} from {holding.transaction_currency} to {targetCurrency}: {ex.Message}");
+                priceInTargetCurrency = priceUsd.Value.close_price; // Fallback to USD price
+            }
         }
 
         var value = quantity * priceInTargetCurrency;
@@ -1138,7 +1147,7 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation", async (
         {
             symbol,
             quantity,
-            price_usd = Math.Round(priceUsd.Value, 2),
+            price_usd = Math.Round(priceUsd.Value.close_price, 2),
             price = Math.Round(priceInTargetCurrency, 2),
             value = Math.Round(value, 2)
         });

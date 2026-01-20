@@ -2,6 +2,8 @@ using Npgsql;
 using Dapper;
 using System.Data;
 using EtfInsight.Api.Services;
+using EtfInsight.Api.Repositories;
+using EtfInsight.Api.Contracts;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +26,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddScoped<IDbConnection>(_ => new Npgsql.NpgsqlConnection(connectionString));
 builder.Services.AddScoped<IFxRateService, FxRateService>();
 
+builder.Services.AddScoped<IValuationRepository, PostgresValuationRepository>();
+builder.Services.AddScoped<ValuationService>();
+
 var app = builder.Build();
 
 // Request logging middleware
@@ -39,7 +44,6 @@ app.Use(async (context, next) =>
 
         var duration = (DateTime.UtcNow - startTime).TotalMilliseconds;
         var statusCode = context.Response.StatusCode;
-
         // Log requests
 
         Console.WriteLine($"[{startTime:yyyy-MM-dd HH:mm:ss}] {requestMethod} {requestPath} -> {statusCode} ({duration:F0}ms)");
@@ -521,7 +525,9 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation/history", async (
     int portfolioId,
     string? from,
     string? to,
-    IDbConnection db) =>
+    IDbConnection db,
+    ValuationService valuationService,
+    CancellationToken cancellationToken) =>
 {
 
     var portfolioExists = await db.ExecuteScalarAsync<bool>(
@@ -534,104 +540,28 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation/history", async (
     }
 
     // Default date range: last 30 days
-    var toDate = string.IsNullOrWhiteSpace(to) ?
-        DateTime.UtcNow.Date
-        : DateTime.Parse(to).Date;
+    var toDate = string.IsNullOrWhiteSpace(to)
+      ? DateOnly.FromDateTime(DateTime.UtcNow.Date)
+      : DateOnly.Parse(to);
 
-    var fromDate = string.IsNullOrWhiteSpace(from) ?
-        DateTime.UtcNow.AddDays(-30).Date
-        : DateTime.Parse(from).Date;
+    var fromDate = string.IsNullOrWhiteSpace(from)
+        ? toDate.AddDays(-30)
+        : DateOnly.Parse(from);
 
     // Get all trading days in the date range
-    var tradingDaysQuery = @"
-        SELECT DISTINCT price_date::timestamp as price_date
-        FROM etf_prices
-        WHERE price_date >= @FromDate AND price_date <= @ToDate
-        ORDER BY price_date ASC
-    ";
+    var points = await valuationService.GetHistoryAsync(
+        portfolioId,
+        fromDate,
+        toDate,
+        cancellationToken);
 
-    var tradingDays = await db.QueryAsync<DateTime>(tradingDaysQuery, new
-    {
-        FromDate = fromDate,
-        ToDate = toDate
-    });
-
-    var valuationHistory = new List<object>();
-
-    foreach (var day in tradingDays)
-    {
-        var dateStr = day.ToString("yyyy-MM-dd");
-
-        // Calculate holdings as of the day
-        var holdingsQuery = @"
-        SELECT
-            symbol,
-            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) as total_quantity
-        FROM transactions
-        WHERE portfolio_id = @PortfolioId
-        AND transaction_date <= @Date
-        GROUP BY symbol
-        HAVING SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) > 0
-    ";
-
-        var holdings = await db.QueryAsync(holdingsQuery, new
-        {
-            PortfolioId = portfolioId,
-            Date = day
-        });
-
-        if (!holdings.Any())
-        {
-            valuationHistory.Add(new
-            {
-                date = dateStr,
-                total_value = 0.00m
-            });
-            continue;
-        }
-
-
-        decimal totalValue = 0;
-
-        foreach (var holding in holdings)
-        {
-            string symbol = (string)holding.symbol;
-            decimal quantity = (decimal)holding.total_quantity;
-
-            var priceQuery = @"
-            SELECT close_price
-            FROM etf_prices
-            WHERE symbol = @Symbol
-            AND price_date <= @Date
-            ORDER BY price_date DESC
-            LIMIT 1
-        ";
-
-            var priceRecord = await db.ExecuteScalarAsync<decimal?>(priceQuery, new
-            {
-                Symbol = symbol,
-                Date = day
-            });
-
-            if (priceRecord != null)
-            {
-                totalValue += quantity * priceRecord.Value;
-            }
-        }
-
-        valuationHistory.Add(new
-        {
-            date = dateStr,
-            total_value = Math.Round(totalValue, 2)
-        });
-    }
-    return Results.Ok(new
-    {
-        portfolio_id = portfolioId,
-        date_range = new { from = fromDate.ToString("yyyy-MM-dd"), to = toDate.ToString("yyyy-MM-dd") },
-        data = valuationHistory.Count,
-        history = valuationHistory
-    });
+    return Results.Ok(new ValuationHistoryResponse(
+        PortfolioId: portfolioId,
+        From: fromDate,
+        To: toDate,
+        Count: points.Count,
+        Points: points
+    ));
 })
 .WithName("GetPortfolioValuationHistory")
 .WithTags("Portfolios")

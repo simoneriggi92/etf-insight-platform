@@ -1,8 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Transactions;
 using EtfInsight.Core.Models;
 using EtfInsight.Core.Mathematics;
 

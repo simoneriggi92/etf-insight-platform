@@ -2,6 +2,10 @@ using Npgsql;
 using Dapper;
 using System.Data;
 using EtfInsight.Api.Services;
+using EtfInsight.Core.Interfaces;
+using EtfInsight.Core.Models;
+using EtfInsight.Infrastructure.Data;
+using EtfInsight.Core.DTOs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +27,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddScoped<IDbConnection>(_ => new Npgsql.NpgsqlConnection(connectionString));
 builder.Services.AddScoped<IFxRateService, FxRateService>();
+builder.Services.AddScoped<IEtfRepository, PostgresRepository>();
 
 var app = builder.Build();
 
@@ -82,36 +87,21 @@ app.MapGet("/health", () => Results.Ok(new
 
 // Get all tracked symbols
 
-app.MapGet("/api/symbols", async (IDbConnection db) =>
+app.MapGet("/api/symbols", async (IEtfRepository repository) =>
 {
-    var query = @" 
-    SELECT DISTINCT symbol,
-        COUNT(*) as data_points,
-        MIN(price_date) as first_date,     
-        MAX(price_date) as last_date
-    FROM etf_prices 
-    GROUP BY symbol
-    ORDER BY symbol";
-
-    var symbols = await db.QueryAsync(query);
-    return Results.Ok(symbols);
+    var symbolSummaries = await repository.GetSymbolSummaryAsync();
+    return Results.Ok(symbolSummaries);
 })
 .WithName("GetSymbols")
 .WithTags("Symbols")
-.Produces<IEnumerable<object>>(StatusCodes.Status200OK);
+.Produces<IEnumerable<SymbolSummaryDto>>(StatusCodes.Status200OK);
 
 
 // Get latest price for a given symbol
-app.MapGet("/api/prices/latest", async (string symbol, IDbConnection db) =>
+app.MapGet("/api/prices/latest", async (string symbol, IEtfRepository repository) =>
 {
-    var query = @"
-    SELECT symbol, price_date, open_price, high_price, low_price, close_price, volume
-    FROM etf_prices
-    WHERE symbol = @Symbol
-    ORDER BY price_date DESC
-    LIMIT 1";
+    var latestPrice = await repository.GetLatestEtfBySymbolAsync(symbol);
 
-    var latestPrice = await db.QueryFirstOrDefaultAsync(query, new { Symbol = symbol.ToUpper() });
     if (latestPrice == null)
     {
         return Results.NotFound(new ErrorResponse($"No price data found for symbol {symbol}."));
@@ -121,7 +111,7 @@ app.MapGet("/api/prices/latest", async (string symbol, IDbConnection db) =>
 })
 .WithName("GetLatestPrice")
 .WithTags("Prices")
-.Produces<object>(StatusCodes.Status200OK)
+.Produces<LatestSymbolPriceDto>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status404NotFound);
 
 

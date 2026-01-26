@@ -1,7 +1,38 @@
+import psycopg2
 import yfinance as yf
 import json
+import os
 from datetime import datetime
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Database connection config
+DB_CONFIG = {
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": os.getenv("POSTGRES_PORT", "5432"),
+    "database": os.getenv("POSTGRES_DB", "etfinsight"),
+    "user": os.getenv("POSTGRES_USER", "etfinsight"),
+    "password": os.getenv("POSTGRES_PASSWORD", "devpassword123"),
+}
+
+
+def get_db_connection():
+    """Create database connection"""
+    return psycopg2.connect(**DB_CONFIG)
+
+
+def get_active_etf_symbols() -> list:
+    """Retrieve active ETF symbols from the database"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT symbol FROM etf_metadata WHERE is_active = TRUE;")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [row[0] for row in rows]
 
 
 def fetch_etf_price(symbol: str) -> dict:
@@ -38,7 +69,7 @@ def save_raw_response(symbol: str, data: dict):
 
 
 def main():
-    symbols = ["SPY", "QQQ", "VTI", "EUNL", "EUNA", "IS3N"]
+    symbols = get_active_etf_symbols()
 
     for symbol in symbols:
         try:

@@ -121,6 +121,7 @@ app.MapGet("/api/prices", async (
     string? from = null,
     string? to = null,
     IDbConnection db = null!) =>
+    string ? to = null, IEtfRepository repository) =>
 {
     if (string.IsNullOrWhiteSpace(symbol))
     {
@@ -143,6 +144,7 @@ app.MapGet("/api/prices", async (
             AND price_date >= @FromDate
             AND price_date <= @ToDate
         ORDER BY price_date DESC";
+    var prices = await repository.GetPriceHistoryAsync(symbol, fromDate, toDate);
 
     var prices = await db.QueryAsync(query, new
     {
@@ -177,6 +179,7 @@ app.MapGet("/api/prices/stats", async (
     string? from = null,
     string? to = null,
     IDbConnection db = null!) =>
+    string ? to = null, IEtfRepository repository) =>
 {
     if (string.IsNullOrWhiteSpace(symbol))
     {
@@ -207,6 +210,7 @@ app.MapGet("/api/prices/stats", async (
         AND price_date >= @FromDate
         AND price_date <= @ToDate
     GROUP BY symbol";
+    var stats = await repository.GetPriceStatsAsync(symbol, fromDate, toDate);
 
     var stats = await db.QueryFirstOrDefaultAsync(query, new
     {

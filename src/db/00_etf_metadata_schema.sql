@@ -16,4 +16,4 @@ insert into etf_metadata
 values
 	('IS3N.DE', NULL, 'Core MSCI EM IMI USD (Acc)', True, NOW(), NULL),
 	('EUNA.DE', NULL, 'Global Aggregate Bond EUR (Acc)', True, NOW(), NULL),
-	('EUNL.DE', NULL, 'Core MSCI World USD(Acc)', True, NOW(), NULL),
+	('EUNL.DE', NULL, 'Core MSCI World USD(Acc)', True, NOW(), NULL)

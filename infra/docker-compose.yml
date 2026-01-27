@@ -1,31 +1,108 @@
-
 services:
   postgres:
     image: postgres:15-alpine
+    container_name: etf-postgres
+    hostname: postgres
     environment:
-      POSTGRES_DB: etfinsight
-      POSTGRES_USER: etfinsight
-      POSTGRES_PASSWORD: devpassword123
+      POSTGRES_DB: ${POSTGRES_DB:-etfinsight}
+      POSTGRES_USER: ${POSTGRES_USER:-etfinsight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword123}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ../src/db:/docker-entrypoint-initdb.d:ro
+    networks:
+      etf-network:
+        aliases:
+          - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-etfinsight} -d ${POSTGRES_DB:-etfinsight}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   redis:
     image: redis:7-alpine
+    container_name: etf-redis
+    hostname: redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      etf-network:
+        aliases:
+          - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  api:
+  # api:
+  #   build:
+  #     context: ../src/api/EtfInsight.Api
+  #     dockerfile: Dockerfile
+  #   container_name: etf-api
+  #   ports:
+  #     - "${API_PORT:-5000}:8080"
+  #   environment:
+  #     - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB:-etfinsight};Username=${POSTGRES_USER:-etfinsight};Password=${POSTGRES_PASSWORD:-devpassword123}
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   networks:
+  #     - etf-network
+
+  etf_prices_scraper:
     build:
-      context: ../src/api/EtfInsight.Api
+      context: ../src/ingestion
       dockerfile: Dockerfile
-    ports:
-      - "5000:8080"
+      target: scraper
+    container_name: etf-prices-scraper
     environment:
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=etfinsight;Username=etfinsight;Password=devpassword123
+      - POSTGRES_HOST=etf-postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-etfinsight}
+      - POSTGRES_USER=${POSTGRES_USER:-etfinsight}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword123}
+      - PERIOD=${PERIOD:-5d}
+    volumes:
+      - etf_data:/app/data
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    networks:
+      - etf-network
+    restart: "no"
+
+  etf_prices_ingestor:
+    build:
+      context: ../src/ingestion
+      dockerfile: Dockerfile
+      target: ingestor
+    container_name: etf-prices-ingestor
+    environment:
+      - POSTGRES_HOST=etf-postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-etfinsight}
+      - POSTGRES_USER=${POSTGRES_USER:-etfinsight}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword123}
+    volumes:
+      - etf_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      etf_prices_scraper:
+        condition: service_completed_successfully
+    networks:
+      - etf-network
+    restart: "no"
+
+networks:
+  etf-network:
+    driver: bridge
 
 volumes:
   postgres_data:
+  etf_data:

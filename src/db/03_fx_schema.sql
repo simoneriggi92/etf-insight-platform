@@ -18,9 +18,6 @@ CREATE INDEX IF NOT EXISTS idx_fx_rates_date ON fx_rates (rate_date DESC);
 CREATE INDEX IF NOT EXISTS idx_fx_rates_currencies ON fx_rates(from_currency, to_currency);
 CREATE INDEX IF NOT EXISTS idx_fx_rates_lookup ON fx_rates(from_currency, to_currency, rate_date DESC);
 
--- Comments for documentation
-COMMENT ON TABLE fx_rates IS 'Foreign exchange rates from ECB. Rate convention: 1 from_currency = rate to_currency':
-COMMENT ON COLUMN fx_rates.rate IS 'Exchange rate: amount of to_currency per 1 unit of from_currency';
 
 -- Example: EUR/USD rate of 1.10 means 1 EUR = 1.10 USD
 -- To convert: amount_usd = amount_eur * rate

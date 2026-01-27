@@ -2,6 +2,7 @@ import os
 import psycopg2
 import json
 from pathlib import Path
+import time
 from datetime import datetime
 from typing import List, Dict
 from dotenv import load_dotenv
@@ -19,8 +20,21 @@ DB_CONFIG = {
 
 
 def get_db_connection():
-    """Create database connection"""
-    return psycopg2.connect(**DB_CONFIG)
+    """Create database connection with retry logic"""
+    max_retries = 5
+    retry_delay = 2
+
+    for attempt in range(max_retries):
+        try:
+            return psycopg2.connect(**DB_CONFIG)
+        except psycopg2.OperationalError as e:
+            if attempt < max_retries - 1:
+                print(
+                    f"Connection attempt {attempt + 1} failed. Retrying in {retry_delay}s..."
+                )
+                time.sleep(retry_delay)
+            else:
+                raise Exception(f"Failed to connect after {max_retries} attempts: {e}")
 
 
 def parse_price_file(filepath: Path) -> List[Dict]:
@@ -88,8 +102,8 @@ def insert_prices(records: List[Dict]) -> int:
 
 
 def main():
-    raw_dir = Path("../../data/raw")
 
+    raw_dir = Path("/app/data/raw")
     print(f"Loading data from {raw_dir.absolute()}\n")
 
     total_files = 0

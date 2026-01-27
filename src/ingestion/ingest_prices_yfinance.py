@@ -2,6 +2,7 @@ import psycopg2
 import yfinance as yf
 import json
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -21,7 +22,21 @@ DB_CONFIG = {
 
 def get_db_connection():
     """Create database connection"""
-    return psycopg2.connect(**DB_CONFIG)
+    max_retries = 5
+    retry_delay = 2  # seconds
+    for attempt in range(max_retries):
+        try:
+            return psycopg2.connect(**DB_CONFIG)
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(
+                    f"Error connecting to database: {e}. Retrying in {retry_delay}s..."
+                )
+                time.sleep(retry_delay)
+            else:
+                raise Exception(
+                    f"Failed to connect to database after {max_retries} attempts: {e}"
+                )
 
 
 def get_active_etf_symbols() -> list:
@@ -42,7 +57,7 @@ def fetch_etf_price(symbol: str) -> dict:
     ticker = yf.Ticker(symbol)
 
     # Get last 5 days of data
-    hist = ticker.history(period="5d")
+    hist = ticker.history(period=os.getenv("PERIOD", "5d"))
 
     # Convert to dict format similar to Yahoo Finance API
     data = {"symbol": symbol, "data": hist.to_dict("index")}
@@ -52,7 +67,7 @@ def fetch_etf_price(symbol: str) -> dict:
 
 def save_raw_response(symbol: str, data: dict):
     """Save raw API response to disk"""
-    output_dir = Path("../../data/raw")
+    output_dir = Path("/app/data/raw")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Convert datetime keys to strings for JSON serialization

@@ -90,7 +90,31 @@ def save_raw_response(symbol: str, data: dict):
     print(f"Saved to {final_filepath}")
 
 
+def cleanup_old_files(directory: Path, days_old: int = 7):
+    """Delete files older than specified days in the given directory"""
+    now = time.time()
+    cutoff = now - (days_old * 86400)  # days to seconds
+
+    print(f"Deleting files older than {days_old} days in {directory}")
+    deleted_count = 0
+
+    for file in directory.iterdir():
+        if file.is_file():
+            file_mtime = file.stat().st_mtime
+            if file_mtime < cutoff:
+                print(f"Deleting old file: {file}")
+                file.unlink()
+                deleted_count += 1
+
+    print(f"Deleted {deleted_count} old files.")
+
+
 def main():
+
+    # Cleanup old files in raw directory
+    raw_dir = Path("/app/data/raw")
+    cleanup_old_files(raw_dir, days_old=7)
+
     symbols = get_active_etf_symbols()
 
     for symbol in symbols:

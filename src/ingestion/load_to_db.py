@@ -4,6 +4,7 @@ import psycopg2
 import json
 from pathlib import Path
 import time
+import schedule
 from datetime import datetime
 from typing import List, Dict
 from dotenv import load_dotenv
@@ -144,19 +145,19 @@ def move_file_to_error(filepath: Path, error_dir: Path, error_msg: str):
     print(f"  → Error log: {error_log_path.name}")
 
 
-def main():
+def ingest_job():
+    """Main ingestion job to run on schedule"""
+    print(f"\n{'='*60}")
+    print(f"Starting ingest job at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*60}")
 
     raw_dir = Path("/app/data/raw")
     processed_dir = Path("/app/data/processed")
     error_dir = Path("/app/data/error")
 
-    # Create processed and error directories if they don't exist
+    # Create processed and error directories
     processed_dir.mkdir(parents=True, exist_ok=True)
     error_dir.mkdir(parents=True, exist_ok=True)
-
-    print(f"Loading data from {raw_dir.absolute()}\n")
-    print(f"Processed files → {processed_dir.absolute()}")
-    print(f"Error files → {error_dir.absolute()}\n")
 
     total_files = 0
     total_records = 0
@@ -164,7 +165,6 @@ def main():
     total_errors = 0
 
     # Process JSON files in raw/ and raw/history
-
     search_patterns = [
         raw_dir.glob("*.json"),
         raw_dir.glob("history/*.json"),
@@ -173,6 +173,11 @@ def main():
     all_files = []
     for pattern in search_patterns:
         all_files.extend(pattern)
+
+    if not all_files:
+        print("No files to process\n")
+        print(f"{'='*60}\n")
+        return
 
     # Process all JSON files
     for json_file in sorted(all_files):
@@ -186,18 +191,19 @@ def main():
             inserted = insert_prices(records)
             total_inserted += inserted
 
-            print(f"  Parsed {len(records)} records, inserted {inserted} new records\n")
+            print(f"  Parsed {len(records)} records, inserted {inserted} new records")
 
+            # Move to processed
             move_file_to_processed(json_file, processed_dir)
             print()
 
         except Exception as e:
             total_errors += 1
             error_trace = traceback.format_exc()
-            print(f"  Error processing file: {e}\n")
+            print(f"  ✗ Error processing file: {e}")
             print(f"  Stack trace:\n{error_trace}")
 
-            # Move to error directory with log
+            # Move to error directory with error log
             move_file_to_error(json_file, error_dir, error_trace)
             print()
             continue
@@ -209,6 +215,27 @@ def main():
     print(f"  Total records parsed: {total_records}")
     print(f"  New records inserted: {total_inserted}")
     print(f"  Duplicates skipped: {total_records - total_inserted}")
+    print(f"Completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*60}\n")
+
+
+def main():
+    print("ETF Data Ingestor - Scheduled Mode")
+    print("Scheduled: Every", os.getenv("INGESTOR_INTERVAL_MINUTES", "1"), "minutes")
+    print("Started at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S\n"))
+
+    # Schedule the job every N minutes
+    schedule.every(int(os.getenv("INGESTOR_INTERVAL_MINUTES", "1"))).minutes.do(
+        ingest_job
+    )
+
+    # Run immediately on startup
+    ingest_job()
+
+    # Keep running
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 
 if __name__ == "__main__":

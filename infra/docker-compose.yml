@@ -61,12 +61,13 @@ services:
       target: scraper
     container_name: etf-prices-scraper
     environment:
-      - POSTGRES_HOST=etf-postgres
+      - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-etfinsight}
       - POSTGRES_USER=${POSTGRES_USER:-etfinsight}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword123}
       - PERIOD=${PERIOD:-5d}
+      - SCRAPER_INTERVAL_MINUTES=${SCRAPER_INTERVAL_MINUTES:-2}
     volumes:
       - etf_data:/app/data
     depends_on:
@@ -74,7 +75,7 @@ services:
         condition: service_healthy
     networks:
       - etf-network
-    restart: "no"
+    restart: unless-stopped
 
   etf_prices_ingestor:
     build:
@@ -83,21 +84,20 @@ services:
       target: ingestor
     container_name: etf-prices-ingestor
     environment:
-      - POSTGRES_HOST=etf-postgres
+      - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-etfinsight}
       - POSTGRES_USER=${POSTGRES_USER:-etfinsight}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword123}
+      - INGESTOR_INTERVAL_MINUTES=${INGESTOR_INTERVAL_MINUTES:-1}
     volumes:
       - etf_data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
-      etf_prices_scraper:
-        condition: service_completed_successfully
     networks:
       - etf-network
-    restart: "no"
+    restart: unless-stopped
 
 networks:
   etf-network:

@@ -21,12 +21,13 @@ RUN mkdir -p /app/data/raw && chown -R etfuser:etfuser /app
 # Switch to non-root user
 USER etfuser
 
+# Set Python to run in unbuffered mode for real-time logs
+ENV PYTHONUNBUFFERED=1
+
 # Stage for scraper service
 FROM base AS scraper
-CMD ["python", "ingest_prices_yfinance.py"]
+CMD ["python", "-u", "ingest_prices_yfinance.py"]
 
 # Stage for ingestor service
 FROM base AS ingestor
-CMD ["python", "load_to_db.py"]
-
-
+CMD ["python", "-u", "load_to_db.py"]

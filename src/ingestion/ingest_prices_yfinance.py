@@ -66,7 +66,7 @@ def fetch_etf_price(symbol: str) -> dict:
 
 
 def save_raw_response(symbol: str, data: dict):
-    """Save raw API response to disk"""
+    """Save raw API response to disk with atomic write (outbox pattern)"""
     output_dir = Path("/app/data/raw")
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -74,13 +74,20 @@ def save_raw_response(symbol: str, data: dict):
     if "data" in data:
         data["data"] = {str(k): v for k, v in data["data"].items()}
 
-    filename = f"{symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    filepath = output_dir / filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    tmp_filename = f"{symbol}_{timestamp}.json.tmp"
+    final_filename = f"{symbol}_{timestamp}.json"
+    tmp_filepath = output_dir / tmp_filename
+    final_filepath = output_dir / final_filename
 
-    with open(filepath, "w") as f:
+    # Write to temp file first
+    with open(tmp_filepath, "w") as f:
         json.dump(data, f, indent=2, default=str)
 
-    print(f"Saved to {filepath}")
+    # Atomic rename to final filename
+    os.rename(tmp_filepath, final_filepath)
+
+    print(f"Saved to {final_filepath}")
 
 
 def main():

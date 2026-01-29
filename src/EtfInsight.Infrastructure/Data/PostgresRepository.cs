@@ -104,5 +104,10 @@ namespace EtfInsight.Infrastructure.Data
                 Volume = result.FirstOrDefault()?.Volume ?? 0
             };
         }
+
+        public Task<List<SymbolSummaryDto>> GetPriceHistoryAsync(string symbol, DateTime fromDate, DateTime toDate)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

@@ -19,5 +19,6 @@ namespace EtfInsight.Core.Interfaces
         Task<IEnumerable<Etf>> GetAllEtfsAsync();
         Task<IEnumerable<SymbolSummaryDto>> GetSymbolSummaryAsync();
         Task<LatestSymbolPriceDto?> GetLatestEtfBySymbolAsync(string symbol);
+        Task<List<SymbolSummaryDto>> GetPriceHistoryAsync(string symbol, DateTime fromDate, DateTime toDate);
     }
 }

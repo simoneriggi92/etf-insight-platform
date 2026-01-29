@@ -1,8 +1,10 @@
+import sys
 import psycopg2
 import yfinance as yf
 import json
 import os
 import time
+from graceful_killer import GracefulKiller
 import schedule
 import traceback
 from datetime import datetime
@@ -122,7 +124,7 @@ def cleanup_old_files(directory: Path, days_old: int = 7):
         print(f"No old files to delete")
 
 
-def scrape_job():
+def scrape_job(killer=None):
     """Main scraping job to run on schedule"""
     print(f"\n{'='*60}")
     print(f"Starting scrape job at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -141,6 +143,12 @@ def scrape_job():
         print(f"Found {len(symbols)} active ETF symbols: {', '.join(symbols)}\n")
 
         for symbol in symbols:
+
+            # Check for graceful shutdown signal
+            if killer and killer.kill_now:
+                print("Graceful shutdown requested. Skipping remaining symbols")
+                break
+
             try:
                 data = fetch_etf_price(symbol)
 
@@ -172,22 +180,32 @@ def scrape_job():
 
 
 def main():
+
+    killer = GracefulKiller()
+
     print("ETF Price Scraper - Scheduled Mode")
     print(f"Schedule: Every {os.getenv('SCRAPER_INTERVAL_MINUTES', '2')} minutes")
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
     # Schedule the scraping job
     schedule.every(int(os.getenv("SCRAPER_INTERVAL_MINUTES", "2"))).minutes.do(
-        scrape_job
+        scrape_job, killer=killer
     )
 
     # run immediately at startup
-    scrape_job()
-
+    scrape_job(killer=killer)
+    
     # Keep running
-    while True:
+    while not killer.kill_now:
         schedule.run_pending()
         time.sleep(1)
+
+    print(f"\n{'='*60}")
+    print("Scraper service stopped gracefully.")
+    print(f"Stopped at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*60}\n")
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":

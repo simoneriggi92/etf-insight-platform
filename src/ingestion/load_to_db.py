@@ -1,9 +1,11 @@
 import os
+import sys
 import traceback
 import psycopg2
 import json
 from pathlib import Path
 import time
+from graceful_killer import GracefulKiller
 import schedule
 from datetime import datetime
 from typing import List, Dict
@@ -220,6 +222,9 @@ def ingest_job():
 
 
 def main():
+
+    killer = GracefulKiller()
+
     print("ETF Data Ingestor - Scheduled Mode")
     print("Scheduled: Every", os.getenv("INGESTOR_INTERVAL_MINUTES", "1"), "minutes")
     print("Started at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S\n"))
@@ -233,9 +238,16 @@ def main():
     ingest_job()
 
     # Keep running
-    while True:
+    while not killer.kill_now:
         schedule.run_pending()
         time.sleep(1)
+
+    print(f"\n{'='*60}")
+    print("Ingestor service stopped gracefully.")
+    print("Stopped at:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    print(f"{'='*60}\n")
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":

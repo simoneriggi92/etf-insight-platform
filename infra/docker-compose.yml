@@ -76,6 +76,7 @@ services:
     networks:
       - etf-network
     restart: unless-stopped
+    stop_grace_period: 30s # Wait up to 30 seconds for graceful shutdown
 
   etf_prices_ingestor:
     build:
@@ -98,7 +99,7 @@ services:
     networks:
       - etf-network
     restart: unless-stopped
-
+    stop_grace_period: 30s # Wait up to 30 seconds for graceful shutdown
 networks:
   etf-network:
     driver: bridge

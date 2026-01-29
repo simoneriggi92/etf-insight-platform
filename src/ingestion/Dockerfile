@@ -12,6 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
+COPY graceful_killer.py .
 COPY ingest_prices_yfinance.py .
 COPY load_to_db.py .
 

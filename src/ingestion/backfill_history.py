@@ -65,14 +65,21 @@ def save_historical_data(symbol: str, data: dict, data_range: str):
     if "data" in data:
         data["data"] = {str(k): v for k, v in data["data"].items()}
 
-    filename = f"{symbol}_{data_range}_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
-    filepath = output_dir / filename
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    tmp_filename = f"{symbol}_{data_range}_{timestamp}.json.tmp"
+    final_filename = f"{symbol}_{data_range}_{timestamp}.json"
+    tmp_filepath = output_dir / tmp_filename
+    final_filepath = output_dir / final_filename
 
-    with open(filepath, "w") as f:
+    # Write to temp file
+    with open(tmp_filepath, "w") as f:
         json.dump(data, f, indent=2, default=str)
 
-    print(f"Saved data to {filepath.name}")
-    return filepath
+    # Atomic rename to final filename
+    tmp_filepath.rename(final_filepath)
+
+    print(f"Saved data to {final_filepath.name}")
+    return final_filepath
 
 
 def main():

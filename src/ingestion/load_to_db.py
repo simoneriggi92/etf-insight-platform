@@ -46,7 +46,7 @@ def parse_price_file(filepath: Path) -> List[Dict]:
     with open(filepath) as f:
         data = json.load(f)
 
-    symbol = data.get("symbol", "UNKNOWN")
+    ticker = data.get("ticker", "UNKNOWN")
     prices = data.get("data", {})
 
     parsed = []
@@ -59,7 +59,7 @@ def parse_price_file(filepath: Path) -> List[Dict]:
         )
 
         record = {
-            "symbol": symbol,
+            "ticker": ticker,
             "price_date": clean_date,
             "open_price": values.get("Open"),
             "high_price": values.get("High"),
@@ -82,9 +82,9 @@ def insert_prices(records: List[Dict]) -> int:
     cur = conn.cursor()
 
     insert_query = """
-        INSERT INTO etf_prices (symbol, price_date, open_price, high_price, low_price, close_price, volume, currency)
-        VALUES (%(symbol)s, %(price_date)s, %(open_price)s, %(high_price)s, %(low_price)s, %(close_price)s, %(volume)s, %(currency)s)
-        ON CONFLICT (symbol, price_date) DO UPDATE SET
+        INSERT INTO etf_prices (ticker, price_date, open_price, high_price, low_price, close_price, volume, currency)
+        VALUES (%(ticker)s, %(price_date)s, %(open_price)s, %(high_price)s, %(low_price)s, %(close_price)s, %(volume)s, %(currency)s)
+        ON CONFLICT (ticker, price_date) DO UPDATE SET
             open_price = EXCLUDED.open_price,
             high_price = EXCLUDED.high_price,
             low_price = EXCLUDED.low_price,
@@ -101,7 +101,7 @@ def insert_prices(records: List[Dict]) -> int:
             if cur.rowcount > 0:
                 inserted += 1
         except Exception as e:
-            print(f"  Error inserting {record['symbol']} {record['price_date']}: {e}")
+            print(f"  Error inserting {record['ticker']} {record['price_date']}: {e}")
             conn.rollback()
             continue
 

@@ -44,36 +44,36 @@ def get_db_connection():
 
 
 def get_active_etf_symbols() -> list:
-    """Retrieve active ETF symbols from the database"""
+    """Retrieve active ETF tickers from the database"""
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT symbol FROM etf_metadata WHERE is_active = TRUE;")
+    cur.execute("SELECT ticker FROM etf_metadata WHERE is_active = TRUE;")
     rows = cur.fetchall()
     cur.close()
     conn.close()
     return [row[0] for row in rows]
 
 
-def fetch_etf_price(symbol: str) -> dict:
+def fetch_etf_price(ticker: str) -> dict:
     """Fetch historical prices using yfinance library"""
-    print(f"Fetching {symbol}...")
+    print(f"Fetching {ticker}...")
 
-    ticker = yf.Ticker(symbol)
+    return_value = yf.Ticker(ticker=ticker)
 
     # Get last 5 days of data
-    hist = ticker.history(period=os.getenv("PERIOD", "5d"))
+    hist = return_value.history(period=os.getenv("PERIOD", "5d"))
 
     # Check if data was retrieved
     if hist is None or hist.empty:
-        raise ValueError(f"No data returned for {symbol}")
+        raise ValueError(f"No data returned for {ticker}")
 
     # Convert to dict format similar to Yahoo Finance API
-    data = {"symbol": symbol, "data": hist.to_dict("index")}
+    data = {"ticker": ticker, "data": hist.to_dict("index")}
 
     return data
 
 
-def save_raw_response(symbol: str, data: dict):
+def save_raw_response(ticker: str, data: dict):
     """Save raw API response to disk with atomic write (outbox pattern)"""
     output_dir = Path("/app/data/raw")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -83,8 +83,8 @@ def save_raw_response(symbol: str, data: dict):
         data["data"] = {str(k): v for k, v in data["data"].items()}
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    tmp_filename = f"{symbol}_{timestamp}.json.tmp"
-    final_filename = f"{symbol}_{timestamp}.json"
+    tmp_filename = f"{ticker}_{timestamp}.json.tmp"
+    final_filename = f"{ticker}_{timestamp}.json"
     tmp_filepath = output_dir / tmp_filename
     final_filepath = output_dir / final_filename
 
@@ -194,7 +194,7 @@ def main():
 
     # run immediately at startup
     scrape_job(killer=killer)
-    
+
     # Keep running
     while not killer.kill_now:
         schedule.run_pending()

@@ -5,8 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
 using EtfInsight.Core.DTOs;
+using EtfInsight.Core.Entities;
 using EtfInsight.Core.Interfaces;
-using EtfInsight.Core.Models;
 
 namespace EtfInsight.Infrastructure.Data
 {

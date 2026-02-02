@@ -3,7 +3,7 @@ using Dapper;
 using System.Data;
 using EtfInsight.Api.Services;
 using EtfInsight.Core.Interfaces;
-using EtfInsight.Core.Models;
+using EtfInsight.Core.Entities;
 using EtfInsight.Infrastructure.Data;
 using EtfInsight.Core.DTOs;
 

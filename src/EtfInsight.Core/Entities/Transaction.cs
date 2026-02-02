@@ -22,9 +22,9 @@ namespace EtfInsight.Core.Entities
 
     public enum TransactionType
     {
-        Buy,
-        Sell,
-        Deposit,
-        Withdraw
+        BUY,
+        SELL,
+        DEPOSIT,
+        WITHDRAW
     }
 }

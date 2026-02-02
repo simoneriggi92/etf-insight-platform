@@ -28,6 +28,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddScoped<IDbConnection>(_ => new Npgsql.NpgsqlConnection(connectionString));
 builder.Services.AddScoped<IFxRateService, FxRateService>();
 builder.Services.AddScoped<IEtfRepository, PostgresRepository>();
+builder.Services.AddScoped<IPortfolioRepository, DapperPortfolioRepository>();
 
 var app = builder.Build();
 
@@ -87,13 +88,13 @@ app.MapGet("/health", () => Results.Ok(new
 
 // Get all tracked symbols
 
-app.MapGet("/api/symbols", async (IEtfRepository repository) =>
+app.MapGet("/api/tickers", async (IEtfRepository repository) =>
 {
     var symbolSummaries = await repository.GetSymbolSummaryAsync();
     return Results.Ok(symbolSummaries);
 })
-.WithName("GetSymbols")
-.WithTags("Symbols")
+.WithName("GetTickers")
+.WithTags("Tickers")
 .Produces<IEnumerable<SymbolSummaryDto>>(StatusCodes.Status200OK);
 
 
@@ -290,36 +291,23 @@ app.MapGet("/api/portfolios", async (IDbConnection db) =>
 
 
 // Get portfolio by ID with sumamry
-app.MapGet("/api/portfolios/{id:int}", async (int id, IDbConnection db) =>
+app.MapGet("/api/portfolios/{id:Guid}", async (Guid id, IPortfolioRepository repository) =>
 {
-    var query = @"
-        SELECT id, name, description, base_currency, created_at
-        FROM portfolios
-        WHERE id = @id";
+    if (id == Guid.Empty)
+    {
+        return Results.BadRequest(new ErrorResponse("Invalid portfolio ID."));
+    }
 
-    var portfolio = await db.QuerySingleOrDefaultAsync(query, new { Id = id });
+    var portfolio = await repository.GetPortfolioWithTransactionsAsync(id);
 
     if (portfolio == null)
     {
         return Results.NotFound(new ErrorResponse($"Portfolio with ID {id} not found."));
     }
 
-    // Get transactions summary
-    var transactionQuery = @"
-        SELECT 
-            COUNT(*) as total_transactions,
-            COUNT(DISTINCT symbol) as unique_symbols,
-            SUM(CASE WHEN transaction_type = 'BUY' THEN quantity * price ELSE 0 END) as total_invested,
-            SUM(CASE WHEN transaction_type = 'SELL' THEN quantity * price ELSE 0 END) as total_proceeds
-        FROM transactions
-        WHERE portfolio_id = @Id";
-
-    var summary = await db.QuerySingleAsync(transactionQuery, new { Id = id });
-
     return Results.Ok(new
     {
-        portfolio,
-        summary
+        portfolio
     });
 })
 .WithName("GetPortfolio")

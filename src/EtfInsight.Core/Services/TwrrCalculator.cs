@@ -55,27 +55,18 @@ namespace EtfInsight.Core.Services
 
             // Initialize TWRR calculation variables
             decimal totalReturn = 0m;
+            decimal previousDayValue = 0m;
             var currentDate = minDate;
 
             // STEP 2: Daily Iteration from minDate to maxDate
             while (currentDate <= maxDate)
             {
                 // STEP 3: Calculate portfolio value before cash flows (valueStart)
-                // Value = units_owned_yesterday * price_today
-                decimal valueStart = 0m;
-                foreach (var ticker in holdings.Keys)
-                {
-                    var units = holdings[ticker];
-                    if (units == 0) continue;
-
-                    // Get today's price or carry forward last known price
-                    decimal todayPrice = GetPriceForDate(ticker, currentDate, priceLookup, lastKnownPrices);
-                    valueStart += units * todayPrice;
-                }
+                // Use yesterday's ending value, NOT recalculated with today's prices
+                decimal valueStart = previousDayValue;
 
                 // STEP 4: Process cash flows (transactions) for the day
                 decimal cashFlow = 0m;
-                decimal valueEnd = valueStart;
 
                 if (transactionsByDate.ContainsKey(currentDate))
                 {
@@ -113,29 +104,32 @@ namespace EtfInsight.Core.Services
                                 break;
                         }
                     }
-
-                    // Recalculate valueEnd after processing transactions using updated holdings
-                    valueEnd = 0m;
-                    foreach (var ticker in holdings.Keys)
-                    {
-                        var units = holdings[ticker];
-                        if (units == 0) continue;
-
-                        decimal todayPrice = GetPriceForDate(ticker, currentDate, priceLookup, lastKnownPrices);
-                        valueEnd += units * todayPrice;
-                    }
                 }
 
+                // Recalculate valueEnd after processing transactions using updated holdings
+                decimal valueEnd = 0m;
+                foreach (var ticker in holdings.Keys)
+                {
+                    var units = holdings[ticker];
+                    if (units == 0) continue;
+
+                    decimal todayPrice = GetPriceForDate(ticker, currentDate, priceLookup, lastKnownPrices);
+                    valueEnd += units * todayPrice;
+                }
                 // STEP 5: Calaculate sub-period return for the day
                 // Formula rn = (valueEnd - cashFlow) / valueStart - 1
                 // Simplified when no cash flows: rn. = (todayPrice / yesterdayPrice) - 1
                 if (valueStart > 0)
                 {
-                    decimal subPeriodReturn = (valueEnd - cashFlow) / valueStart - 1;
+                    decimal subPeriodReturn = ((valueEnd - cashFlow) / valueStart) - 1;
 
                     // STEP 6: Aggregate sub-period returns into TotalReturn
                     totalReturn = (1 + totalReturn) * (1 + subPeriodReturn) - 1;
                 }
+
+                // Save today's ending value for tomorrow's starting value
+                previousDayValue = valueEnd;
+
                 // Move to next day
                 currentDate = currentDate.AddDays(1);
             }

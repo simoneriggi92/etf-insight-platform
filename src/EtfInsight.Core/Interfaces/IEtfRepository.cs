@@ -8,7 +8,8 @@ namespace EtfInsight.Core.Interfaces
     {
         // DTO operations (for API responses) - only expose what's needed
         Task<IEnumerable<SymbolSummaryDto>> GetSymbolSummaryAsync();
-        Task<LatestSymbolPriceDto?> GetLatestEtfBySymbolAsync(string symbol);
-        Task<List<SymbolSummaryDto>> GetPriceHistoryAsync(string symbol, DateTime fromDate, DateTime toDate);
+        Task<LatestSymbolPriceDto?> GetLatestEtfBySymbolAsync(string ticker);
+        Task<List<Etf>> GetPriceHistoryAsync(string ticker, DateTime fromDate, DateTime toDate);
+        Task<IEnumerable<Etf>> GetPriceHistoryAsync(IEnumerable<string> tickers, DateTime fromDate, DateTime toDate);
     }
 }

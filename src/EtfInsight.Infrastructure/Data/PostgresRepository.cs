@@ -75,11 +75,11 @@ namespace EtfInsight.Infrastructure.Data
             throw new NotImplementedException();
         }
 
-        public async Task<LatestSymbolPriceDto?> GetLatestEtfBySymbolAsync(string symbol)
+        public async Task<LatestSymbolPriceDto?> GetLatestEtfBySymbolAsync(string ticker)
         {
             var query = @"
                 SELECT 
-                    symbol as Symbol, 
+                    ticker as Ticker, 
                     price_date as PriceDate, 
                     open_price as OpenPrice, 
                     high_price as HighPrice, 
@@ -87,15 +87,15 @@ namespace EtfInsight.Infrastructure.Data
                     close_price as ClosePrice, 
                     volume as Volume
                 FROM etf_prices
-                WHERE symbol = @Symbol
+                WHERE ticker = @Ticker
                 ORDER BY price_date DESC
                 LIMIT 1";
 
-            var result = await _db.QueryAsync<Etf?>(query, new { Symbol = symbol });
+            var result = await _db.QueryAsync<Etf?>(query, new { Ticker = ticker });
 
             return new LatestSymbolPriceDto
             {
-                Symbol = result.FirstOrDefault()?.Symbol ?? string.Empty,
+                Ticker = result.FirstOrDefault()?.Ticker ?? string.Empty,
                 PriceDate = result.FirstOrDefault()?.PriceDate ?? DateOnly.MinValue,
                 OpenPrice = result.FirstOrDefault()?.OpenPrice ?? 0,
                 ClosePrice = result.FirstOrDefault()?.ClosePrice ?? 0,
@@ -105,9 +105,45 @@ namespace EtfInsight.Infrastructure.Data
             };
         }
 
-        public Task<List<SymbolSummaryDto>> GetPriceHistoryAsync(string symbol, DateTime fromDate, DateTime toDate)
+        public async Task<List<Etf>> GetPriceHistoryAsync(string ticker, DateTime fromDate, DateTime toDate)
         {
-            throw new NotImplementedException();
+            var query = @"
+                SELECT 
+                    ticker as Ticker,
+                    price_date as PriceDate,
+                    open_price as OpenPrice,
+                    high_price as HighPrice,
+                    low_price as LowPrice,
+                    close_price as ClosePrice,
+                    volume as Volume
+                FROM etf_prices
+                WHERE ticker = @Ticker AND price_date BETWEEN @FromDate AND @ToDate
+                ORDER BY price_date ASC";
+
+            var results = await _db.QueryAsync<Etf?>(query, new { Ticker = ticker, FromDate = fromDate, ToDate = toDate });
+
+            return results.Where(r => r != null).Select(r => r!).ToList();
         }
+
+        public Task<IEnumerable<Etf>> GetPriceHistoryAsync(IEnumerable<string> tickers, DateTime fromDate, DateTime toDate)
+        {
+            var query = @"
+                SELECT 
+                    ticker as Ticker,
+                    price_date as PriceDate,
+                    open_price as OpenPrice,
+                    high_price as HighPrice,
+                    low_price as LowPrice,
+                    close_price as ClosePrice,
+                    volume as Volume
+                FROM etf_prices
+                WHERE ticker = ANY(@Tickers) AND price_date BETWEEN @FromDate AND @ToDate
+                ORDER BY ticker, price_date ASC";
+
+            return _db.QueryAsync<Etf>(query, new { Tickers = tickers.ToArray(), FromDate = fromDate, ToDate = toDate });
+
+        }
+
+
     }
 }

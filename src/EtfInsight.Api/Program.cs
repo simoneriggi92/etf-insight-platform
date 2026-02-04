@@ -6,6 +6,7 @@ using EtfInsight.Core.Interfaces;
 using EtfInsight.Core.Entities;
 using EtfInsight.Infrastructure.Data;
 using EtfInsight.Core.DTOs;
+using EtfInsight.Core.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +30,7 @@ builder.Services.AddScoped<IDbConnection>(_ => new Npgsql.NpgsqlConnection(conne
 builder.Services.AddScoped<IFxRateService, FxRateService>();
 builder.Services.AddScoped<IEtfRepository, PostgresRepository>();
 builder.Services.AddScoped<IPortfolioRepository, DapperPortfolioRepository>();
+builder.Services.AddScoped<IPerformanceCalculator, TwrrCalculator>();
 
 var app = builder.Build();
 
@@ -619,6 +621,51 @@ app.MapGet("/api/portfolios/{portfolioId:int}/valuation/history", async (
 .WithTags("Portfolios")
 .Produces<object>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status404NotFound);
+
+
+app.MapGet("/api/portfolios/{portfolioId:guid}/performanceDummy", async (
+    Guid portfolioId,
+    string? from,
+    string? to,
+    IPortfolioRepository repository,
+    IEtfRepository etfRepository,
+    IPerformanceCalculator performanceCalculator,
+    IDbConnection db) =>
+{
+    var portfolio = await repository.GetPortfolioWithTransactionsAsync(portfolioId);
+
+    if (portfolio == null)
+    {
+        return Results.NotFound(new ErrorResponse($"Portfolio with ID {portfolioId} not found."));
+    }
+
+    var etfTickers = portfolio.Transactions
+        .Select(t => t.Ticker)
+        .Distinct()
+        .ToList();
+
+    var etfPrices = await etfRepository.GetPriceHistoryAsync(
+        etfTickers,
+        DateTime.Parse(from ?? "2000-01-01"),
+        DateTime.Parse(to ?? DateTime.UtcNow.ToString("yyyy-MM-dd"))
+    );
+
+    var performanceMetrics = performanceCalculator.CalculateTWRR(
+        portfolio.Transactions,
+            etfPrices);
+
+    return Results.Ok(new
+    {
+        portfolioId = portfolioId,
+        date_range = new { from = from ?? "2000-01-01", to = to ?? DateTime.UtcNow.ToString("yyyy-MM-dd") },
+        twrr = Math.Round(performanceMetrics, 4)
+    });
+})
+.WithName("GetPortfolioPerformanceDummy")
+.WithTags("Portfolios")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound);
+
 
 app.MapGet("/api/portfolios/{portfolioId:int}/performance", async (
     int portfolioId,

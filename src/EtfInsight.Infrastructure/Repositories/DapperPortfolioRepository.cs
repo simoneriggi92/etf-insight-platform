@@ -7,7 +7,7 @@ using Dapper;
 using EtfInsight.Core.Entities;
 using EtfInsight.Core.Interfaces;
 
-namespace EtfInsight.Infrastructure.Data
+namespace EtfInsight.Infrastructure.Repositories
 {
     public class DapperPortfolioRepository : IPortfolioRepository
     {

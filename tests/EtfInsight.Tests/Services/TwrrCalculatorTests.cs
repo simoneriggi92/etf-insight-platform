@@ -56,9 +56,9 @@ namespace EtfInsight.Tests.Services
                 }
             };
 
-            var prices = new List<Etf>
+            var prices = new List<EtfPrice>
             {
-                new Etf
+                new EtfPrice
                 {
                     Id = Guid.NewGuid(),
                     Ticker = "TEST.ETF",
@@ -66,7 +66,7 @@ namespace EtfInsight.Tests.Services
                     ClosePrice = 100m,
                     Currency = "EUR"
                 },
-                new Etf
+                new EtfPrice
                 {
                     Id = Guid.NewGuid(),
                     Ticker = "TEST.ETF",
@@ -74,7 +74,7 @@ namespace EtfInsight.Tests.Services
                     ClosePrice = 110m,
                     Currency = "EUR"
                 },
-                new Etf
+                new EtfPrice
                 {
                     Id = Guid.NewGuid(),
                     Ticker = "TEST.ETF",
@@ -95,9 +95,9 @@ namespace EtfInsight.Tests.Services
         {
             // Arrange
             var transactions = new List<Transaction>();
-            var prices = new List<Etf>
+            var prices = new List<EtfPrice>
             {
-                new Etf
+                new EtfPrice
                 {
                     Id = Guid.NewGuid(),
                     Ticker = "TEST.ETF",
@@ -133,7 +133,7 @@ namespace EtfInsight.Tests.Services
                     Fees = 0m
                 }
             };
-            var prices = new List<Etf>();
+            var prices = new List<EtfPrice>();
 
             // Act
             var result = _calculator.CalculateTWRR(transactions, prices);
@@ -164,9 +164,9 @@ namespace EtfInsight.Tests.Services
                 }
             };
 
-            var prices = new List<Etf>
+            var prices = new List<EtfPrice>
             {
-                new Etf
+                new EtfPrice
                 {
                     Id = Guid.NewGuid(),
                     Ticker = "TEST.ETF",
@@ -174,7 +174,7 @@ namespace EtfInsight.Tests.Services
                     ClosePrice = 100m,
                     Currency = "EUR"
                 },
-                new Etf
+                new EtfPrice
                 {
                     Id = Guid.NewGuid(),
                     Ticker = "TEST.ETF",
@@ -226,12 +226,12 @@ namespace EtfInsight.Tests.Services
                 }
             };
 
-            var prices = new List<Etf>
+            var prices = new List<EtfPrice>
             {
-                new Etf { Ticker = "TEST.ETF", PriceDate = new DateOnly(2026, 1, 1), ClosePrice = 100m },
-                new Etf { Ticker = "TEST.ETF", PriceDate = new DateOnly(2026, 1, 2), ClosePrice = 110m },
-                new Etf { Ticker = "TEST.ETF", PriceDate = new DateOnly(2026, 1, 3), ClosePrice = 120m },
-                new Etf { Ticker = "TEST.ETF", PriceDate = new DateOnly(2026, 1, 4), ClosePrice = 125m }
+                new EtfPrice { Ticker = "TEST.ETF", PriceDate = new DateOnly(2026, 1, 1), ClosePrice = 100m },
+                new EtfPrice { Ticker = "TEST.ETF", PriceDate = new DateOnly(2026, 1, 2), ClosePrice = 110m },
+                new EtfPrice { Ticker = "TEST.ETF", PriceDate = new DateOnly(2026, 1, 3), ClosePrice = 120m },
+                new EtfPrice { Ticker = "TEST.ETF", PriceDate = new DateOnly(2026, 1, 4), ClosePrice = 125m }
             };
 
             // Act
@@ -276,12 +276,12 @@ namespace EtfInsight.Tests.Services
                 }
             };
 
-            var prices = new List<Etf>
+            var prices = new List<EtfPrice>
             {
-                new Etf { Ticker = "ETF-A", PriceDate = new DateOnly(2026, 1, 1), ClosePrice = 100m },
-                new Etf { Ticker = "ETF-A", PriceDate = new DateOnly(2026, 1, 2), ClosePrice = 110m },
-                new Etf { Ticker = "ETF-B", PriceDate = new DateOnly(2026, 1, 1), ClosePrice = 50m },
-                new Etf { Ticker = "ETF-B", PriceDate = new DateOnly(2026, 1, 2), ClosePrice = 55m }
+                new EtfPrice { Ticker = "ETF-A", PriceDate = new DateOnly(2026, 1, 1), ClosePrice = 100m },
+                new EtfPrice { Ticker = "ETF-A", PriceDate = new DateOnly(2026, 1, 2), ClosePrice = 110m },
+                new EtfPrice { Ticker = "ETF-B", PriceDate = new DateOnly(2026, 1, 1), ClosePrice = 50m },
+                new EtfPrice { Ticker = "ETF-B", PriceDate = new DateOnly(2026, 1, 2), ClosePrice = 55m }
             };
 
             // Act

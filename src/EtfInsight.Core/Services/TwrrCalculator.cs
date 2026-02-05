@@ -8,7 +8,7 @@ namespace EtfInsight.Core.Services
 {
     public class TwrrCalculator : IPerformanceCalculator
     {
-        public decimal CalculateTWRR(IEnumerable<Transaction> transactions, IEnumerable<Etf> etfPrices)
+        public decimal CalculateTWRR(IEnumerable<Transaction> transactions, IEnumerable<EtfPrice> etfPrices)
         {
             // input validation
             var transactionList = transactions.OrderBy(t => t.TransactionDate).ToList();

@@ -1,4 +1,5 @@
 using System.Data;
+using System.Security;
 using Dapper;
 using EtfInsight.Core.Entities;
 using EtfInsight.Core.Interfaces;
@@ -212,6 +213,24 @@ public class PortfoliosController : ControllerBase
             transaction);
     }
 
+    [HttpGet("{id}/analytics/valuation/history")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetValuationHistory(Guid id, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to)
+    {
+        var dashboard = await _portfolioAnalyticsService.GetPortfolioAnalyticsAsync(
+            id,
+            from ?? DateOnly.Parse("2000-01-01"),
+            to ?? DateOnly.FromDateTime(DateTime.UtcNow)
+        );
+
+        // Simple filtering in memory (for now ok, then can be optimized in service or DB)
+        var history = dashboard.History
+            .Where(d => (!from.HasValue || d.Date >= from.Value) && (!to.HasValue || d.Date <= to.Value))
+            .OrderBy(d => d.Date);
+
+        return Ok(history.ToList());
+    }
     /// <summary>
     /// Get portfolio dashboard summary
     /// </summary>

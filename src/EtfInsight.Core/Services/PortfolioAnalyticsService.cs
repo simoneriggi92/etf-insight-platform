@@ -32,17 +32,18 @@ namespace EtfInsight.Core.Services
             if (portfolio == null || !portfolio.Transactions.Any())
                 return new PortfolioDashboardDto { PortfolioId = portfolioId };
 
-            var transactions = portfolio.Transactions
+            // 1. Get all transactions up to 'to' date
+            var allTransactions = portfolio.Transactions
                 .Where(t => t.TransactionDate <= to)
                 .OrderBy(t => t.TransactionDate)
                 .ToList();
 
-            if (!transactions.Any())
+            if (!allTransactions.Any())
                 return new PortfolioDashboardDto { PortfolioId = portfolioId };
 
-            var minDate = from > transactions.First().TransactionDate ? from : transactions.First().TransactionDate;
+            var minDate = from;
             var maxDate = to;
-            var tickers = transactions.Select(t => t.Ticker).Distinct().ToList();
+            var tickers = allTransactions.Select(t => t.Ticker).Distinct().ToList();
 
             var prices = await _priceRepo.GetPricesByTickersAsync(tickers, minDate, maxDate);
 
@@ -57,10 +58,44 @@ namespace EtfInsight.Core.Services
             decimal peakValue = 0m;
             decimal globalMaxDrawdown = 0m;
 
-            var txByDate = transactions
+            // 2. Process all transactions BEFORE the 'from' date to build initial state
+            var preWindowTxs = allTransactions.Where(t => t.TransactionDate < from);
+            foreach (var tx in preWindowTxs)
+            {
+                if (!currentHoldings.ContainsKey(tx.Ticker))
+                    currentHoldings[tx.Ticker] = 0;
+
+                decimal txAmount = tx.Units * tx.PricePerUnit + tx.Fees;
+
+                switch (tx.Type)
+                {
+                    case TransactionType.BUY:
+                        currentHoldings[tx.Ticker] += tx.Units;
+                        cumulativeNetFlow += txAmount;
+                        break;
+
+                    case TransactionType.SELL:
+                        currentHoldings[tx.Ticker] -= tx.Units;
+                        cumulativeNetFlow -= (tx.Units * tx.PricePerUnit - tx.Fees);
+                        break;
+
+                    case TransactionType.DEPOSIT:
+                        cumulativeNetFlow += tx.Units;
+                        break;
+
+                    case TransactionType.WITHDRAW:
+                        cumulativeNetFlow -= tx.Units;
+                        break;
+                }
+            }
+
+            // 3. Group transactions in the window by date
+            var txByDate = allTransactions
+                .Where(t => t.TransactionDate >= from)
                 .GroupBy(t => t.TransactionDate)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
+            // 4. Loop only through the requested date range
             for (var date = minDate; date <= maxDate; date = date.AddDays(1))
             {
                 decimal dailyNetFlow = 0m;

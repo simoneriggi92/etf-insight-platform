@@ -424,9 +424,10 @@ namespace EtfInsight.Tests.Services
         }
 
         [Fact]
-        public async Task GetPortfolioAnalyticsAsync_NoTransactionsInRange_ReturnsEmptyResult()
+        public async Task GetPortfolioAnalyticsAsync_TransactionsBeforeFromDate_IncludesInHoldings()
         {
-            // Arrange
+            // Arrange: Transaction in Dec 2025, but querying Jan 2026
+            // Should include the transaction to calculate holdings correctly
             var portfolioId = Guid.NewGuid();
             var portfolio = new Portfolio
             {
@@ -434,32 +435,50 @@ namespace EtfInsight.Tests.Services
                 Name = "Test Portfolio",
                 Currency = Currency.USD,
                 Transactions = new List<Transaction>
-                {
-                    new Transaction
-                    {
-                        Id = Guid.NewGuid(),
-                        PortfolioId = portfolioId,
-                        Ticker = "ETF1",
-                        TransactionDate = new DateOnly(2025, 12, 1), // Outside range
-                        Type = TransactionType.BUY,
-                        Units = 10m,
-                        PricePerUnit = 100m,
-                        Fees = 0m
-                    }
-                }
+        {
+            new Transaction
+            {
+                Id = Guid.NewGuid(),
+                PortfolioId = portfolioId,
+                Ticker = "ETF1",
+                TransactionDate = new DateOnly(2025, 12, 1), // Before 'from'
+                Type = TransactionType.BUY,
+                Units = 10m,
+                PricePerUnit = 100m,
+                Fees = 5m
+            }
+        }
             };
 
-            _portfolioRepo.SetPortfolio(portfolio);
+            var prices = new List<EtfPrice>
+    {
+        new EtfPrice { Ticker = "ETF1", PriceDate = new DateOnly(2026, 1, 1), ClosePrice = 110m },
+        new EtfPrice { Ticker = "ETF1", PriceDate = new DateOnly(2026, 1, 2), ClosePrice = 115m },
+        new EtfPrice { Ticker = "ETF1", PriceDate = new DateOnly(2026, 1, 3), ClosePrice = 120m }
+    };
 
-            // Act
+            _portfolioRepo.SetPortfolio(portfolio);
+            _priceRepo.SetPrices(prices);
+
+            // Act: Query from Jan 1 to Jan 3, 2026
             var result = await _service.GetPortfolioAnalyticsAsync(
                 portfolioId,
-                new DateOnly(2026, 1, 1),
-                new DateOnly(2026, 1, 3));
+                new DateOnly(2026, 1, 1),  // from
+                new DateOnly(2026, 1, 3)); // to
 
-            // Assert
+            // Assert: Should include holdings from Dec transaction
             Assert.Equal(portfolioId, result.PortfolioId);
-            Assert.Empty(result.History);
+            Assert.Equal(3, result.History.Count()); // 3 days: Jan 1-3
+
+            // First day should have 10 units valued at 110
+            var day1 = result.History.First();
+            Assert.Equal(new DateOnly(2026, 1, 1), day1.Date);
+            Assert.Equal(1100m, day1.TotalValue); // 10 * 110
+            Assert.Equal(1005m, day1.CumulativeNetFlow); // 10*100 + 5 from Dec
+            Assert.Equal(0m, day1.NetFlow); // No transaction on this day
+
+            // Final value
+            Assert.Equal(1200m, result.CurrentTotalValue); // 10 * 120
         }
     }
 

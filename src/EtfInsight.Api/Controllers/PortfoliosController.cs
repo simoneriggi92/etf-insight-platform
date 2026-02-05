@@ -16,20 +16,20 @@ public class PortfoliosController : ControllerBase
     private readonly IDbConnection _db;
     private readonly IPortfolioRepository _portfolioRepository;
     private readonly IEtfPriceRepository _etfPriceRepository;
-    private readonly IPerformanceCalculator _performanceCalculator;
+    private readonly IPortfolioAnalyticsService _portfolioAnalyticsService;
     private readonly ILogger<PortfoliosController> _logger;
 
     public PortfoliosController(
         IDbConnection db,
         IPortfolioRepository portfolioRepository,
         IEtfPriceRepository etfPriceRepository,
-        IPerformanceCalculator performanceCalculator,
+        IPortfolioAnalyticsService portfolioAnalyticsService,
         ILogger<PortfoliosController> logger)
     {
         _db = db;
         _portfolioRepository = portfolioRepository;
         _etfPriceRepository = etfPriceRepository;
-        _performanceCalculator = performanceCalculator;
+        _portfolioAnalyticsService = portfolioAnalyticsService;
         _logger = logger;
     }
 
@@ -215,113 +215,25 @@ public class PortfoliosController : ControllerBase
     /// <summary>
     /// Get portfolio dashboard summary
     /// </summary>
-    [HttpGet("{portfolioId:int}/dashboard")]
+    [HttpGet("{id}/analytics/dashboard")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetDashboard(int portfolioId)
+    public async Task<IActionResult> GetDashboard(Guid id, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to)
     {
-        var portfolioExists = await _db.ExecuteScalarAsync<bool>(
-            "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
-            new { Id = portfolioId });
+        var dashboard = await _portfolioAnalyticsService.GetPortfolioAnalyticsAsync(
+            id,
+            from ?? DateOnly.Parse("2000-01-01"),
+            to ?? DateOnly.FromDateTime(DateTime.UtcNow)
+        );
 
-        if (!portfolioExists)
-        {
-            return NotFound(new { Error = $"Portfolio with ID {portfolioId} not found." });
-        }
-
-        var portfolioQuery = @"
-            SELECT id, name, description, base_currency, created_at
-            FROM portfolios
-            WHERE id = @Id";
-
-        var portfolio = await _db.QuerySingleAsync(portfolioQuery, new { Id = portfolioId });
-        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
-
-        var holdingsQuery = @"
-            SELECT
-                symbol,
-                SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) as total_quantity
-            FROM transactions
-            WHERE portfolio_id = @PortfolioId
-            AND transaction_date <= @Today
-            GROUP BY symbol
-            HAVING SUM(CASE WHEN transaction_type = 'BUY' THEN quantity ELSE -quantity END) > 0";
-
-        var holdings = await _db.QueryAsync(holdingsQuery, new
-        {
-            PortfolioId = portfolioId,
-            Today = DateTime.Parse(today)
-        });
-
-        var currentValue = 0m;
-        var holdingDetails = new List<object>();
-
-        foreach (var holding in holdings)
-        {
-            string symbol = (string)holding.symbol;
-            decimal quantity = (decimal)holding.total_quantity;
-
-            var priceQuery = @"
-                SELECT close_price
-                FROM etf_prices
-                WHERE symbol = @Symbol
-                    AND price_date <= @Today
-                ORDER BY price_date DESC
-                LIMIT 1";
-
-            var priceRecord = await _db.ExecuteScalarAsync<decimal?>(priceQuery, new
-            {
-                Symbol = symbol,
-                Today = DateTime.Parse(today)
-            });
-
-            if (priceRecord != null)
-            {
-                var value = quantity * priceRecord.Value;
-                currentValue += value;
-
-                holdingDetails.Add(new
-                {
-                    symbol,
-                    quantity = Math.Round(quantity, 2),
-                    price = Math.Round(priceRecord.Value, 2),
-                    value = Math.Round(value, 2),
-                    allocation_percent = 0.00m
-                });
-            }
-        }
-
-        var updatedHoldings = holdingDetails.Select(h =>
-        {
-            dynamic hDyn = h;
-            var value = (decimal)hDyn.value;
-            return new
-            {
-                hDyn.symbol,
-                hDyn.quantity,
-                hDyn.price,
-                hDyn.value,
-                allocation_percent = currentValue > 0
-                    ? Math.Round((value / currentValue) * 100, 2)
-                    : 0.00m
-            };
-        }).ToList();
-
-        holdingDetails = updatedHoldings.Cast<object>().ToList();
-
-        return Ok(new
-        {
-            portfolio,
-            current_value = Math.Round(currentValue, 2),
-            holdings = holdingDetails
-        });
+        return Ok(dashboard);
     }
 
     /// <summary>
     /// Get portfolio performance
     /// </summary>
 
-    [HttpGet("{id}/performance")]
+    [HttpGet("{id}/analytics/performance")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPortfolioPerformance(
@@ -363,7 +275,7 @@ public class PortfoliosController : ControllerBase
             DateOnly.Parse(to ?? DateTime.UtcNow.ToString("yyyy-MM-dd"))
         );
 
-        var twrr = performanceCalculator.CalculateTWRR(
+        var twrr = _portfolioAnalyticsService.CalculateTWRR(
             portfolio.Transactions,
                 etfPrices);
 
@@ -392,4 +304,6 @@ public class PortfoliosController : ControllerBase
         DateTime TransactionDate,
         string? Notes
     );
+
+    public record ErrorResponse(string Error);
 }

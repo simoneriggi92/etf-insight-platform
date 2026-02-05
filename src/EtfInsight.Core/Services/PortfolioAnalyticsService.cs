@@ -33,7 +33,7 @@ namespace EtfInsight.Core.Services
                 return new PortfolioDashboardDto { PortfolioId = portfolioId };
 
             var transactions = portfolio.Transactions
-                .Where(t => t.TransactionDate >= from && t.TransactionDate <= to)
+                .Where(t => t.TransactionDate <= to)
                 .OrderBy(t => t.TransactionDate)
                 .ToList();
 

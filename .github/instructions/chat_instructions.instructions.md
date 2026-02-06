@@ -16,3 +16,4 @@ When generating code, please adhere to the following guidelines:
 2. Try to be as concise as possible while maintaining clarity, even if you need to sacrifice the grammar for sake of brevity.
 3. When I ask you how to implement a feature, always provide a complete code snippet, then I'll decide whether I'm going to implement it by myself or ask you to do it.
 4. Always guide me step by step when I ask you to help me implement a feature.
+5. Do large use of Mermaid diagrams to explain complex concepts, data flows, or architecture when necessary.

@@ -451,11 +451,11 @@ namespace EtfInsight.Tests.Services
             };
 
             var prices = new List<EtfPrice>
-    {
-        new EtfPrice { Ticker = "ETF1", PriceDate = new DateOnly(2026, 1, 1), ClosePrice = 110m },
-        new EtfPrice { Ticker = "ETF1", PriceDate = new DateOnly(2026, 1, 2), ClosePrice = 115m },
-        new EtfPrice { Ticker = "ETF1", PriceDate = new DateOnly(2026, 1, 3), ClosePrice = 120m }
-    };
+            {
+                new EtfPrice { Ticker = "ETF1", PriceDate = new DateOnly(2026, 1, 1), ClosePrice = 110m },
+                new EtfPrice { Ticker = "ETF1", PriceDate = new DateOnly(2026, 1, 2), ClosePrice = 115m },
+                new EtfPrice { Ticker = "ETF1", PriceDate = new DateOnly(2026, 1, 3), ClosePrice = 120m }
+            };
 
             _portfolioRepo.SetPortfolio(portfolio);
             _priceRepo.SetPrices(prices);

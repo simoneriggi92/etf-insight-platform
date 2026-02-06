@@ -5,10 +5,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
 using EtfInsight.Core.DTOs;
+using EtfInsight.Core.Entities;
 using EtfInsight.Core.Interfaces;
-using EtfInsight.Core.Models;
 
-namespace EtfInsight.Infrastructure.Data
+namespace EtfInsight.Infrastructure.Repositories
 {
     public class PostgresRepository : IEtfRepository
     {
@@ -75,37 +75,57 @@ namespace EtfInsight.Infrastructure.Data
             throw new NotImplementedException();
         }
 
-        public async Task<LatestSymbolPriceDto?> GetLatestEtfBySymbolAsync(string symbol)
+        // public async Task<LatestSymbolPriceDto?> GetLatestEtfBySymbolAsync(string ticker)
+        // {
+        //     var query = @"
+        //         SELECT 
+        //             ticker as Ticker, 
+        //             price_date as PriceDate, 
+        //             open_price as OpenPrice, 
+        //             high_price as HighPrice, 
+        //             low_price as LowPrice, 
+        //             close_price as ClosePrice, 
+        //             volume as Volume
+        //         FROM etf_prices
+        //         WHERE ticker = @Ticker
+        //         ORDER BY price_date DESC
+        //         LIMIT 1";
+
+        //     var result = await _db.QueryAsync<Etf?>(query, new { Ticker = ticker });
+
+        //     return new LatestSymbolPriceDto
+        //     {
+        //         Ticker = result.FirstOrDefault()?.Ticker ?? string.Empty,
+        //         PriceDate = result.FirstOrDefault()?.PriceDate ?? DateOnly.MinValue,
+        //         OpenPrice = result.FirstOrDefault()?.OpenPrice ?? 0,
+        //         ClosePrice = result.FirstOrDefault()?.ClosePrice ?? 0,
+        //         HighPrice = result.FirstOrDefault()?.HighPrice ?? 0,
+        //         LowPrice = result.FirstOrDefault()?.LowPrice ?? 0,
+        //         Volume = result.FirstOrDefault()?.Volume ?? 0
+        //     };
+        // }
+
+        public async Task<List<Etf>> GetPriceHistoryAsync(string ticker, DateTime fromDate, DateTime toDate)
         {
             var query = @"
                 SELECT 
-                    symbol as Symbol, 
-                    price_date as PriceDate, 
-                    open_price as OpenPrice, 
-                    high_price as HighPrice, 
-                    low_price as LowPrice, 
-                    close_price as ClosePrice, 
+                    ticker as Ticker,
+                    price_date as PriceDate,
+                    open_price as OpenPrice,
+                    high_price as HighPrice,
+                    low_price as LowPrice,
+                    close_price as ClosePrice,
                     volume as Volume
                 FROM etf_prices
-                WHERE symbol = @Symbol
-                ORDER BY price_date DESC
-                LIMIT 1";
+                WHERE ticker = @Ticker AND price_date BETWEEN @FromDate AND @ToDate
+                ORDER BY price_date ASC";
 
-            var result = await _db.QueryAsync<Etf?>(query, new { Symbol = symbol });
+            var results = await _db.QueryAsync<Etf?>(query, new { Ticker = ticker, FromDate = fromDate, ToDate = toDate });
 
-            return new LatestSymbolPriceDto
-            {
-                Symbol = result.FirstOrDefault()?.Symbol ?? string.Empty,
-                PriceDate = result.FirstOrDefault()?.PriceDate ?? DateOnly.MinValue,
-                OpenPrice = result.FirstOrDefault()?.OpenPrice ?? 0,
-                ClosePrice = result.FirstOrDefault()?.ClosePrice ?? 0,
-                HighPrice = result.FirstOrDefault()?.HighPrice ?? 0,
-                LowPrice = result.FirstOrDefault()?.LowPrice ?? 0,
-                Volume = result.FirstOrDefault()?.Volume ?? 0
-            };
+            return results.Where(r => r != null).Select(r => r!).ToList();
         }
 
-        public Task<List<SymbolSummaryDto>> GetPriceHistoryAsync(string symbol, DateTime fromDate, DateTime toDate)
+        public Task<LatestSymbolPriceDto?> GetLatestEtfBySymbolAsync(string ticker)
         {
             throw new NotImplementedException();
         }

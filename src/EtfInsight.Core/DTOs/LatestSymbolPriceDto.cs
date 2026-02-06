@@ -7,7 +7,7 @@ namespace EtfInsight.Core.DTOs
 {
     public class LatestSymbolPriceDto
     {
-        public string Symbol { get; set; } = string.Empty;
+        public string Ticker { get; set; } = string.Empty;
         public DateOnly PriceDate { get; set; }
         public decimal OpenPrice { get; set; }
         public decimal ClosePrice { get; set; }

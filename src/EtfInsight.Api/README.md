@@ -8,44 +8,44 @@
 
 #### Health Check
 
-```http
+```httpdumm
 GET /health
 ```
 
-#### Get All Symbols
+#### Get All Tickers
 
 ```http
-GET /api/symbols
+GET /api/tickers
 ```
 
-Returns list of tracked ETF symbols with data range.
+Returns list of tracked ETF Tickers with data range.
 
 #### Get Latest Price
 
 ```http
-GET /api/prices/latest?symbol={SYMBOL}
+GET /api/prices/latest?ticker={ticker}
 ```
 
-Example: `api/prices/latest?symbol=SPY`
+Example: `api/prices/latest?ticker=SPY`
 
 #### Get Price History
 
 ```http
-GET /api/prices?symbol={SYMBOL}&from={DATE}&to={DATE}
+GET /api/prices?ticker={ticker}&from={DATE}&to={DATE}
 ```
 
-Example: `/api/prices?symbol=QQQ&from=2024-01-01&to=2024-12-31`
+Example: `/api/prices?ticker=QQQ&from=2024-01-01&to=2024-12-31`
 
 Parameters:
 
-- `symbol` (required): ETF symbol
+- `ticker` (required): ETF ticker
 - `from` (optional): Start date (YYYY-MM-DD), default: 30 days ago
 - `to` (optional): End date (YYYY-MM-DD), default: today
 
 #### Get Price Statistics
 
 ```http
-GET /api/prices/stats?symbol={SYMBOL}&from={DATE}&to={DATE}
+GET /api/prices/stats?ticker={ticker}&from={DATE}&to={DATE}
 ```
 
 Returns min/max/avg prices, trading days, volume statistics.
@@ -81,15 +81,15 @@ Returns the details for all portfolios
 ### Add transactions to portfolio
 
 ```http
-POST /api/portfolios/{id}/transactions?symbol={SYMBOL}&transaction_type={TTYPE}&quantity={QTY}&price={PRICE}&currency="{CCY}"&transaction_date={TDATE}&notes="{NOTES}"
+POST /api/portfolios/{id}/transactions?ticker={ticker}&transaction_type={TTYPE}&quantity={QTY}&price={PRICE}&currency="{CCY}"&transaction_date={TDATE}&notes="{NOTES}"
 ```
 
 Parameters:
 
-- `symbol` (required): ETF symbol
+- `ticker` (required): ETF ticker
 - `transaction_type` (required): the transaction type (BUY/SELL)
-- `quantity` (required): ETF symbol shares quantity
-- `price` (required): ETF symbol shares price per unit
+- `quantity` (required): ETF ticker shares quantity
+- `price` (required): ETF ticker shares price per unit
 - `currency` (optional): price currency
 - `transaction_date` (optional): the date of transaction
 - `notes` (optional): the notes of transaction

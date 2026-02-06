@@ -1,6 +1,6 @@
 using System;
 
-namespace EtfInsight.Core.Models
+namespace EtfInsight.Core.Entities
 {
     public class SymbolSummary
     {

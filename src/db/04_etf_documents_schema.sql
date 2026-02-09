@@ -1,4 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ETF Documents table to look into (ETF Descriptions, News, etc.)
 CREATE TABLE IF NOT EXISTS etf_documents (
@@ -10,9 +9,11 @@ CREATE TABLE IF NOT EXISTS etf_documents (
     created_at TIMESTAMP DEFAULT NOW(),
     is_mandatory BOOL DEFAULT False,
 
-    CONSTRAINT fk_ticker_doc FOREIGN KEY (ticker) REFERENCES etf_metadata(ticker) ON DELETE CASCADE
+    CONSTRAINT fk_ticker_doc FOREIGN KEY (ticker) 
+        REFERENCES etf_metadata(ticker) ON DELETE CASCADE
 );
 
 - Index HNSW (Hierarchical Navigable Small World) for fast search
 -- With no index, vectorial seaerch is slow (sequential  scan)
-CREATE INDEX ON etf_documents USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_etf_documents_embedding
+    ON etf_documents USING hnsw (embedding vector_cosine_ops);

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace EtfInsight.Core.Services
+namespace EtfInsight.Core.Interfaces
 {
     public interface IEmbeddingGenerator
     {

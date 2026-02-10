@@ -13,7 +13,11 @@ CREATE TABLE IF NOT EXISTS etf_documents (
         REFERENCES etf_metadata(ticker) ON DELETE CASCADE
 );
 
-- Index HNSW (Hierarchical Navigable Small World) for fast search
+-- Create UNIQUE contraint on ticker
+ALTER TABLE etf_documents ADD CONSTRAINT unique_ticker UNIQUE (ticker);
+
+
+-- Index HNSW (Hierarchical Navigable Small World) for fast search
 -- With no index, vectorial seaerch is slow (sequential  scan)
 CREATE INDEX IF NOT EXISTS idx_etf_documents_embedding
     ON etf_documents USING hnsw (embedding vector_cosine_ops);

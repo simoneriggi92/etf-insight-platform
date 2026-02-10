@@ -41,6 +41,7 @@ builder.Services.AddScoped<IPortfolioRepository, DapperPortfolioRepository>();
 builder.Services.AddScoped<IPerformanceCalculator, TwrrCalculator>();
 builder.Services.AddScoped<IPortfolioAnalyticsService, PortfolioAnalyticsService>();
 builder.Services.AddScoped<IEmbeddingGenerator, OllamaEmbeddingService>();
+builder.Services.AddScoped<ISemanticSearchRepository, DapperSemanticSearchRepository>();
 
 var app = builder.Build();
 

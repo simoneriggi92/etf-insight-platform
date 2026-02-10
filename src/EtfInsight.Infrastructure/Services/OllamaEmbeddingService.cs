@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using EtfInsight.Core.Configuration;
+using EtfInsight.Core.Interfaces;
 using EtfInsight.Core.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

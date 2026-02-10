@@ -9,6 +9,7 @@ namespace EtfInsight.Core.Configuration
     {
         public string OllamaUrl { get; set; } = "http://localhost:11434";
         public string EmbeddingModel { get; set; } = "nomic-embed-text";
+        public string ChatModel { get; set; } = "llama3.2";
         public int EmbeddingDimensions { get; set; } = 768;
     }
 }

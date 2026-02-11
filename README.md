@@ -1,4 +1,6 @@
-# 📈 ETFInsight: AI-Powered Investment Portfolio Manager
+from pathlib import Path
+
+md = """# 📈 ETFInsight: AI-Powered Investment Portfolio Manager
 
 > **A modern financial platform combining rigorous performance analytics (TWRR) with Generative AI (RAG) to provide actionable investment insights.**
 
@@ -27,19 +29,135 @@ The solution follows **Clean Architecture** and **Domain-Driven Design (DDD)** p
 
 ```mermaid
 graph TD
-  User[User] --> API[API]
+    User[User / Client] --> API[.NET 8 Web API]
 
-  subgraph Core[Core]
-    API --> Engine[TWRR Engine]
-    API --> RAG[RAG Service]
-  end
+    subgraph CoreDomain["Core Domain"]
+        API --> Engine["Performance Engine (TWRR)"]
+        API --> RAG["RAG & Chat Service"]
+    end
 
-  subgraph Data[Data]
-    Engine --> DB[(Postgres)]
-    RAG --> Vector[(pgvector)]
-  end
+    subgraph DataVector["Data & Vector Layer"]
+        Engine --> DB[(PostgreSQL)]
+        RAG --> VectorDB[(pgvector)]
+    end
 
-  subgraph Ext[External]
-    Ingest[Python Ingestion] --> DB
-    RAG
+    subgraph ExternalWorld["External World"]
+        Scraper["Python Ingestion"] --> DB
+        RAG --> Ollama["Ollama (Local LLM)"]
+    end
 ```
+
+---
+
+## 🧩 Key Components
+
+- **Core API (.NET 8)**  
+  Manages portfolios, transactions, and orchestrates the AI workflow.
+
+- **Performance Engine**  
+  Implements **Time-Weighted Rate of Return (TWRR)** to calculate accurate performance regardless of cash flows (deposits/withdrawals).  
+  Provides analytics like **PnL**, **drawdowns**, **peaks**, and **annualized return**.
+
+- **AI & Vector Search**  
+  Uses **pgvector** for semantic search on ETF descriptions and **Ollama (Llama 3)** for Retrieval Augmented Generation (**RAG**).
+
+- **Data Ingestion (Python)**  
+  Autonomous dockerized scraper to fetch **EOD (End-of-Day)** market data.
+
+---
+
+## 🗺️ Roadmap & Progress
+
+The project follows a strict **6-Month Architectural Roadmap**.
+
+### ✅ Phase 1: Foundation (Month 1)
+- [x] Dockerized environment (Python Scraper + Postgres + .NET API).
+- [x] Database schema design (financial strict types).
+- [x] Core domain entities (Portfolio, Transactions).
+
+### ✅ Phase 2: The Math Engine (Month 2)
+- [x] Implementation of TWRR (Time-Weighted Rate of Return).
+- [x] Handling of complex cash flows (Deposits, Withdrawals, Fees).
+- [x] Financial dashboard (PnL, Drawdown, Annualized Return).
+- [x] Unit testing validation against manual calculations.
+
+### ✅ Phase 3: The AI Brain (Month 3)
+- [x] Integration with Ollama (Local LLM).
+- [x] pgvector setup for embedding storage (768 dimensions).
+- [x] Semantic search engine ("Find ETFs about AI").
+- [x] RAG pipeline: chat with your financial data.
+
+### 🚧 Phase 4: Data Quality & Trust (Month 4) — In Progress
+- [ ] Database auditing (time-travel queries).
+- [ ] Anomaly detection (flash-crash protection).
+- [ ] Data validation logic (Specification Pattern).
+
+### ⏳ Phase 5: Event-Driven Architecture (Month 5)
+- [ ] Background jobs (Hangfire/Quartz).
+- [ ] Asynchronous ingestion pipeline.
+
+### ⏳ Phase 6: Scale & UI (Month 6)
+- [ ] Frontend dashboard.
+- [ ] CI/CD pipelines.
+- [ ] Final architectural refactoring.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- **Docker Desktop** (Required)
+- **Ollama** installed on host machine (for AI features)
+
+Pull required models:
+```bash
+ollama pull nomic-embed-text
+ollama pull llama3
+```
+
+### Installation
+
+1) Clone the repo
+```bash
+git clone https://github.com/your-username/ETFInsight.git
+cd ETFInsight
+```
+
+2) Configure environment  
+Ensure your `.env` or `appsettings.json` points to the correct Docker host for Ollama (usually `host.docker.internal:11434`).
+
+3) Run with Docker Compose
+```bash
+docker-compose up --build
+```
+
+4) Access the system
+- **Swagger API**: `http://localhost:5000/swagger` (or port defined in `docker-compose`)
+- **Database**: `localhost:5432` (User/Pass in compose file)
+
+---
+
+## 🧪 Testing the AI
+
+Once running, you can seed the vector database and chat with it:
+
+- **Seed embeddings**: `POST /api/search/seed`
+- **Ask a question**: `POST /api/chat`
+
+Example payload:
+```json
+{
+  "question": "Which ETFs are best for exposure to US Tech?"
+}
+```
+
+---
+
+## 📄 License
+
+MIT
+"""
+
+path = Path("/mnt/data/ETFInsight_README.md")
+path.write_text(md, encoding="utf-8")
+str(path), path.stat().st_size

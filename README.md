@@ -36,6 +36,8 @@ graph TD
         Scraper[Python Ingestion] --> DB
         RAG --> Ollama[Ollama (Local LLM)]
     end
+```
+
 Key Components
 Core API (.NET 8): Manages Portfolios, Transactions, and coordinates the AI workflow.
 

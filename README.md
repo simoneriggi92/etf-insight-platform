@@ -42,3 +42,4 @@ graph TD
   subgraph Ext[External]
     Ingest[Python Ingestion] --> DB
     RAG
+```

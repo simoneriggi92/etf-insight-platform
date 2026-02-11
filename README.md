@@ -27,19 +27,18 @@ The solution follows **Clean Architecture** and **Domain-Driven Design (DDD)** p
 
 ```mermaid
 graph TD
-    User[User / Client] --> API[.NET 8 Web API]
-    
-    subgraph "Core Domain"
-        API --> Engine[Performance Engine (TWRR)]
-        API --> RAG[RAG & Chat Service]
-    end
-    
-    subgraph "Data & Vector Layer"
-        Engine --> DB[(PostgreSQL)]
-        RAG --> VectorDB[(pgvector)]
-    end
-    
-    subgraph "External World"
-        Scraper[Python Ingestion] --> DB
-        RAG --> Ollama[Ollama (Local LLM)]
-    end
+  User[User] --> API[API]
+
+  subgraph Core[Core]
+    API --> Engine[TWRR Engine]
+    API --> RAG[RAG Service]
+  end
+
+  subgraph Data[Data]
+    Engine --> DB[(Postgres)]
+    RAG --> Vector[(pgvector)]
+  end
+
+  subgraph Ext[External]
+    Ingest[Python Ingestion] --> DB
+    RAG

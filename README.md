@@ -1,4 +1,3 @@
-from pathlib import Path
 
 # 📈 ETFInsight: AI-Powered Investment Portfolio Manager
 
@@ -154,10 +153,4 @@ Example payload:
 ---
 
 ## 📄 License
-
 MIT
-"""
-
-path = Path("/mnt/data/ETFInsight_README.md")
-path.write_text(md, encoding="utf-8")
-str(path), path.stat().st_size

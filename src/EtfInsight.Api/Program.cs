@@ -7,6 +7,8 @@ using EtfInsight.Core.Entities;
 using EtfInsight.Infrastructure.Repositories;
 using EtfInsight.Core.DTOs;
 using EtfInsight.Core.Services;
+using EtfInsight.Core.Configuration;
+using EtfInsight.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +25,10 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+builder.Services.Configure<AISettings>(builder.Configuration.GetSection("AI"));
+
+builder.Services.AddHttpClient("Ollama");
+
 // Database connection
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Host=localhost;Port=5432;Database=etfinsight;Username=etfinsight;Password=devpassword123";
@@ -34,6 +40,9 @@ builder.Services.AddScoped<IEtfPriceRepository, DapperEtfPriceRepository>();
 builder.Services.AddScoped<IPortfolioRepository, DapperPortfolioRepository>();
 builder.Services.AddScoped<IPerformanceCalculator, TwrrCalculator>();
 builder.Services.AddScoped<IPortfolioAnalyticsService, PortfolioAnalyticsService>();
+builder.Services.AddScoped<IEmbeddingGenerator, OllamaEmbeddingService>();
+builder.Services.AddScoped<ISemanticSearchRepository, DapperSemanticSearchRepository>();
+builder.Services.AddScoped<IChatService, OllamaChatService>();
 
 var app = builder.Build();
 

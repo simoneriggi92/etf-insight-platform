@@ -1,6 +1,6 @@
-from pathlib import Path
 
-md = """# 📈 ETFInsight: AI-Powered Investment Portfolio Manager
+
+# 📈 ETFInsight: AI-Powered Investment Portfolio Manager
 
 > **A modern financial platform combining rigorous performance analytics (TWRR) with Generative AI (RAG) to provide actionable investment insights.**
 

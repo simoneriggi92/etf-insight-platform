@@ -61,7 +61,7 @@ namespace EtfInsight.Api.Controllers
                 {
                     try
                     {
-                        _logger.LogInformation("Generation embedding for {Ticker}", ticker);
+                        _logger.LogInformation("Generating embedding for {Ticker}", ticker);
 
                         var embedding = await _embeddingGenerator.GenerateEmbeddingAsync(description);
 
@@ -69,7 +69,7 @@ namespace EtfInsight.Api.Controllers
 
                         savedCount++;
 
-                        _logger.LogInformation("✓ Saved {Ticker} ({Dimensions}d)", ticker, embedding.Length);
+                        _logger.LogInformation("Saved {Ticker} with {Dimensions} dimensions", ticker, embedding.Length);
                     }
                     catch (System.Exception ex)
                     {

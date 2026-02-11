@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
@@ -27,6 +28,11 @@ namespace EtfInsight.Infrastructure.Repositories
         {
             try
             {
+                _logger.LogInformation("Saving embedding for ticker {Ticker}", ticker);
+
+                // Use InvariantCulture to ensure decimal points (.) not commas (,)
+                var embeddingString = $"[{string.Join(",", embedding.Select(f => f.ToString(CultureInfo.InvariantCulture)))}]";
+
                 var sql = @"
                     INSERT INTO etf_documents (ticker, content, embedding, metadata, is_mandatory)
                     VALUES (@Ticker, @Content, @Embedding::vector, @Metadata::jsonb, @IsMandatory)
@@ -41,15 +47,14 @@ namespace EtfInsight.Infrastructure.Repositories
                 {
                     Ticker = ticker,
                     Content = content,
-                    embedding = $"[{string.Join(",", embedding)}]",
+                    Embedding = embeddingString,
                     Metadata = "{\"source\": \"manual_seed\", \"version\": \"1.0\"}",
                     IsMandatory = false
                 };
 
                 await _connection.ExecuteAsync(sql, parameters);
 
-                _logger.LogInformation("Saved embedding for ticker {Ticker} with {Dimensions} dimensions",
-                  ticker, embedding.Length);
+                _logger.LogInformation("Successfully saved embedding for {Ticker}", ticker);
             }
             catch (Exception ex)
             {
@@ -62,6 +67,8 @@ namespace EtfInsight.Infrastructure.Repositories
         {
             try
             {
+                _logger.LogInformation("Performing semantic search with limit {Limit}", limit);
+
                 var sql = @"
                     SELECT 
                         ticker,
@@ -71,9 +78,10 @@ namespace EtfInsight.Infrastructure.Repositories
                     ORDER BY embedding <=> @QueryEmbedding::vector
                     LIMIT @Limit";
 
+                // Use InvariantCulture to ensure decimal points (.) not commas (,)
                 var parameters = new
                 {
-                    QueryEmbedding = $"[{string.Join(",", queryEmbedding)}]",
+                    QueryEmbedding = $"[{string.Join(",", queryEmbedding.Select(f => f.ToString(CultureInfo.InvariantCulture)))}]",
                     Limit = limit
                 };
 

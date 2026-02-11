@@ -50,8 +50,7 @@ namespace EtfInsight.Infrastructure.Services
                 var json = JsonSerializer.Serialize(request, jsonOptions);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                _logger.LogInformation("Generating embedding for text of length {Length} using model {Model}",
-                    input.Length, _aiSettings.EmbeddingModel);
+                _logger.LogInformation("Generating embedding using model {Model}", _aiSettings.EmbeddingModel);
 
                 var response = await _httpClient.PostAsync("/api/embeddings", content);
                 response.EnsureSuccessStatusCode();
@@ -63,8 +62,8 @@ namespace EtfInsight.Infrastructure.Services
                 {
                     throw new InvalidOperationException("Ollama returned empty embedding");
                 }
-                _logger.LogInformation("Successfully generated embedding with {Dimensions} dimensions",
-                                  result.Embedding.Length);
+
+                _logger.LogInformation("Generated embedding with {Dimensions} dimensions", result.Embedding.Length);
 
                 return result.Embedding;
             }

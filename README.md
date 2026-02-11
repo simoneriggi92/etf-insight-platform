@@ -51,7 +51,7 @@ graph TD
 
 ## 🧩 Key Components
 
-- **Core API (.NET 8)**  
+- **Core API (.NET 9)**  
   Manages portfolios, transactions, and orchestrates the AI workflow.
 
 - **Performance Engine**  

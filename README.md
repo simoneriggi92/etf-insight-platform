@@ -29,7 +29,7 @@ The solution follows **Clean Architecture** and **Domain-Driven Design (DDD)** p
 
 ```mermaid
 graph TD
-    User[User / Client] --> API[.NET 8 Web API]
+    User[User / Client] --> API[.NET 9 Web API]
 
     subgraph CoreDomain["Core Domain"]
         API --> Engine["Performance Engine (TWRR)"]

@@ -9,6 +9,10 @@ using EtfInsight.Core.DTOs;
 using EtfInsight.Core.Services;
 using EtfInsight.Core.Configuration;
 using EtfInsight.Infrastructure.Services;
+using EtfInsight.DataQuality.Models;
+using EtfInsight.DataQuality.Interfaces;
+using EtfInsight.DataQuality.Rules;
+using EtfInsight.DataQuality.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +31,11 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.Configure<AISettings>(builder.Configuration.GetSection("AI"));
 
+// Data Quality Settings
+builder.Services.Configure<DataQualitySettings>(
+    builder.Configuration.GetSection(DataQualitySettings.SectionName)
+);
+
 builder.Services.AddHttpClient("Ollama");
 
 // Database connection
@@ -36,13 +45,24 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddScoped<IDbConnection>(_ => new Npgsql.NpgsqlConnection(connectionString));
 builder.Services.AddScoped<IFxRateService, FxRateService>();
 builder.Services.AddScoped<IEtfRepository, PostgresRepository>();
-builder.Services.AddScoped<IEtfPriceRepository, DapperEtfPriceRepository>();
+builder.Services.AddScoped<EtfInsight.Core.Interfaces.IEtfPriceRepository, DapperEtfPriceRepository>();
 builder.Services.AddScoped<IPortfolioRepository, DapperPortfolioRepository>();
 builder.Services.AddScoped<IPerformanceCalculator, TwrrCalculator>();
 builder.Services.AddScoped<IPortfolioAnalyticsService, PortfolioAnalyticsService>();
 builder.Services.AddScoped<IEmbeddingGenerator, OllamaEmbeddingService>();
 builder.Services.AddScoped<ISemanticSearchRepository, DapperSemanticSearchRepository>();
 builder.Services.AddScoped<IChatService, OllamaChatService>();
+
+// Data Quality - Register rules
+builder.Services.AddTransient<IDataQualityRule, NegativePriceRule>();
+builder.Services.AddTransient<IDataQualityRule, FlashCrashRule>();
+
+// Data Quality - Register scanner
+builder.Services.AddScoped<DataQualityScanner>();
+
+// TODO: Implement DataQuality repositories in Infrastructure project
+// builder.Services.AddScoped<EtfInsight.DataQuality.Interfaces.IDataQualityRepository, DataQualityRepository>();
+// Note: IEtfPriceRepository from DataQuality is different from Core's version - needs adapter implementation
 
 var app = builder.Build();
 

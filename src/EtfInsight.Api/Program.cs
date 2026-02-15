@@ -57,12 +57,11 @@ builder.Services.AddScoped<IChatService, OllamaChatService>();
 builder.Services.AddTransient<IDataQualityRule, NegativePriceRule>();
 builder.Services.AddTransient<IDataQualityRule, FlashCrashRule>();
 
+builder.Services.AddScoped<EtfInsight.DataQuality.Interfaces.IDataQualityRepository, DapperDataQualityRepository>();
+builder.Services.AddScoped<EtfInsight.DataQuality.Interfaces.IEtfPriceRepository, DataQualityEtfPriceRepository>();
+
 // Data Quality - Register scanner
 builder.Services.AddScoped<DataQualityScanner>();
-
-// TODO: Implement DataQuality repositories in Infrastructure project
-// builder.Services.AddScoped<EtfInsight.DataQuality.Interfaces.IDataQualityRepository, DataQualityRepository>();
-// Note: IEtfPriceRepository from DataQuality is different from Core's version - needs adapter implementation
 
 var app = builder.Build();
 

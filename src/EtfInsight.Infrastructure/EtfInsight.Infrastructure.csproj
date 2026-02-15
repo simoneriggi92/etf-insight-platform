@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../EtfInsight.Core/EtfInsight.Core.csproj" />
+    <ProjectReference Include="../EtfInsight.DataQuality/EtfInsight.DataQuality.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -54,6 +54,9 @@ services:
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB:-etfinsight};Username=${POSTGRES_USER:-etfinsight};Password=${POSTGRES_PASSWORD:-devpassword123}
       - AI__OllamaUrl=http://host.docker.internal:11434 # Adjust if Ollama is running elsewhere
       - AI__EmbeddingModel=nomic-embed-text 
+      - DataQuality__FlashCrashThresholdPercent=20.0
+      - DataQuality__EnableAutoScan=true
+      - DataQuality__ScanIntervalMinutes=5
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,11 +66,11 @@ services:
           - etf-api
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 40s
 
   etf_prices_scraper:
     build:
@@ -106,11 +109,14 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-etfinsight}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword123}
       - INGESTOR_INTERVAL_MINUTES=${INGESTOR_INTERVAL_MINUTES:-1}
+      - DATA_QUALITY_WEBHOOK_URL=http://etf-api:8080/api/data-quality/scan
     volumes:
       - etf_data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
+      etf_api:
+        condition: service_started  # Changed from service_healthy to service_started
     networks:
       - etf-network
     restart: unless-stopped

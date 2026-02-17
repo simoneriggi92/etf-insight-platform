@@ -43,28 +43,13 @@ namespace EtfInsight.Infrastructure.Repositories
                     AND detected_at >= @FromDate
                 ORDER BY detected_at DESC";
 
-            var anomalies = await _db.QueryAsync<DataAnomalyDto>(query, new
+            var anomalies = await _db.QueryAsync<DataAnomaly>(query, new
             {
                 Ticker = ticker,
                 FromDate = DateTime.UtcNow.AddDays(-days)
             });
 
-            return anomalies.Select(dto => new DataAnomaly
-            {
-                Id = dto.Id,
-                Ticker = dto.Ticker,
-                PriceDate = DateOnly.FromDateTime(dto.PriceDate),
-                RuleName = dto.RuleName,
-                Severity = dto.Severity,
-                CurrentValue = dto.CurrentValue,
-                ExpectedRange = dto.ExpectedRange,
-                Message = dto.Message,
-                Metadata = dto.Metadata,
-                DetectedAt = dto.DetectedAt,
-                Resolved = dto.Resolved,
-                ResolvedAt = dto.ResolvedAt,
-                ResolvedBy = dto.ResolvedBy
-            });
+            return anomalies.ToList();
         }
 
         public async Task<IEnumerable<DataAnomaly>> GetUnresolvedAnomaliesAsync()
@@ -88,24 +73,9 @@ namespace EtfInsight.Infrastructure.Repositories
                 WHERE resolved = FALSE
                 ORDER BY detected_at DESC";
 
-            var anomalies = await _db.QueryAsync<DataAnomalyDto>(query);
+            var anomalies = await _db.QueryAsync<DataAnomaly>(query);
 
-            return anomalies.Select(dto => new DataAnomaly
-            {
-                Id = dto.Id,
-                Ticker = dto.Ticker,
-                PriceDate = DateOnly.FromDateTime(dto.PriceDate),
-                RuleName = dto.RuleName,
-                Severity = dto.Severity,
-                CurrentValue = dto.CurrentValue,
-                ExpectedRange = dto.ExpectedRange,
-                Message = dto.Message,
-                Metadata = dto.Metadata,
-                DetectedAt = dto.DetectedAt,
-                Resolved = dto.Resolved,
-                ResolvedAt = dto.ResolvedAt,
-                ResolvedBy = dto.ResolvedBy
-            });
+            return anomalies.ToList();
         }
 
         public async Task InsertAnomalyAsync(DataAnomaly anomaly)

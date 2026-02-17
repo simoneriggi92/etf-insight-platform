@@ -12,7 +12,7 @@ namespace EtfInsight.DataQuality.DTOs
     {
         public Guid Id { get; set; }
         public string Ticker { get; set; } = string.Empty;
-        public DateTime PriceDate { get; set; }
+        public DateOnly PriceDate { get; set; }
         public string RuleName { get; set; } = string.Empty;
         public string Severity { get; set; } = string.Empty;
         public decimal? CurrentValue { get; set; }

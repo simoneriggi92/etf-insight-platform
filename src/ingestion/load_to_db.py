@@ -10,6 +10,8 @@ import schedule
 from datetime import datetime
 from typing import List, Dict
 from dotenv import load_dotenv
+from urllib import request
+from urllib.error import URLError, HTTPError
 
 load_dotenv()
 
@@ -110,6 +112,62 @@ def insert_prices(records: List[Dict]) -> int:
     conn.close()
 
     return inserted
+
+
+def trigger_data_quality_scan():
+    """
+    Trigger data quality scan via HTTP POST webhook
+    Zero latency: validation start immediately after ingestion
+    Retries if API is not ready yet
+    """
+    api_url = os.getenv(
+        "DATA_QUALITY_WEBHOOK_URL", "http://etf-api:8080/api/data-quality/scan"
+    )
+
+    print(f" -> Triggering data quality scan at {api_url}...")
+
+    max_retries = 3
+    retry_delay = 2  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            # Simple HTTP POST with no body, no extra libraries
+            req = request.Request(api_url, method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            with request.urlopen(req, timeout=10) as response:
+                status_code = response.getcode()
+                body = response.read().decode("utf-8")
+
+                if status_code == 200:
+                    print("  ✓ Data quality scan triggered successfully")
+                    try:
+                        result = json.loads(body)
+                        if "stats" in result:
+                            stats = result["stats"]
+                            print(
+                                f"    Checks: {stats.get('pricesChecked', 0)}, "
+                                f"Anomalies: {stats.get('anomaliesDetected', 0)}"
+                            )
+                    except Exception:
+                        pass
+                    return  # Success, exit retry loop
+                else:
+                    print(f"  ⚠ Received status {status_code}: {body}")
+
+        except HTTPError as e:
+            print(f"  ⚠ HTTP error: {e.code} - {e.reason}")
+        except URLError as e:
+            if attempt < max_retries - 1:
+                print(
+                    f"  ⚠ API not ready (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s..."
+                )
+                time.sleep(retry_delay)
+            else:
+                print(f"  ⚠ API not available after {max_retries} attempts: {e.reason}")
+        except Exception as e:
+            print(f"  ⚠ Error triggering scan: {e}")
+            break  # Don't retry on unexpected errors
 
 
 def move_file_to_processed(filepath: Path, processed_dir: Path):
@@ -217,6 +275,11 @@ def ingest_job():
     print(f"  Total records parsed: {total_records}")
     print(f"  New records inserted: {total_inserted}")
     print(f"  Duplicates skipped: {total_records - total_inserted}")
+
+    if total_inserted > 0:
+        print()
+        trigger_data_quality_scan()
+
     print(f"Completed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*60}\n")
 

@@ -4,6 +4,7 @@ WORKDIR /src
 
 # Copy project files for restore (better layer caching)
 COPY ["EtfInsight.Core/EtfInsight.Core.csproj", "EtfInsight.Core/"]
+COPY ["EtfInsight.DataQuality/EtfInsight.DataQuality.csproj", "EtfInsight.DataQuality/"]
 COPY ["EtfInsight.Infrastructure/EtfInsight.Infrastructure.csproj", "EtfInsight.Infrastructure/"]
 COPY ["EtfInsight.Api/EtfInsight.Api.csproj", "EtfInsight.Api/"]
 
@@ -12,6 +13,7 @@ RUN dotnet restore "EtfInsight.Api/EtfInsight.Api.csproj"
 
 # Copy all source files
 COPY ["EtfInsight.Core/", "EtfInsight.Core/"]
+COPY ["EtfInsight.DataQuality/", "EtfInsight.DataQuality/"]
 COPY ["EtfInsight.Infrastructure/", "EtfInsight.Infrastructure/"]
 COPY ["EtfInsight.Api/", "EtfInsight.Api/"]
 
@@ -26,6 +28,9 @@ RUN dotnet publish "EtfInsight.Api.csproj" -c Release -o /app/publish /p:UseAppH
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
+
+# Install Kerberos libraries to silence Npgsql warnings (optional - warning is harmless)
+RUN apt-get update && apt-get install -y libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
 RUN adduser --disabled-password --gecos "" --uid 1000 dotnetuser && \

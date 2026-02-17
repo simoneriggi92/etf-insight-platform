@@ -87,9 +87,9 @@ The project follows a strict **6-Month Architectural Roadmap**.
 - [x] RAG pipeline: chat with your financial data.
 
 ### 🚧 Phase 4: Data Quality & Trust (Month 4) — In Progress
-- [ ] Database auditing (time-travel queries).
-- [ ] Anomaly detection (flash-crash protection).
-- [ ] Data validation logic (Specification Pattern).
+- [x] Database auditing (time-travel queries).
+- [x] Anomaly detection (flash-crash protection).
+- [x] Data validation logic (Specification Pattern).
 
 ### ⏳ Phase 5: Event-Driven Architecture (Month 5)
 - [ ] Background jobs (Hangfire/Quartz).

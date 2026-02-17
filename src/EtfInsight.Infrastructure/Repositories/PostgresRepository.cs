@@ -37,28 +37,28 @@ namespace EtfInsight.Infrastructure.Repositories
             throw new NotImplementedException("GetAllEtfsAsync should return ETF entities, use GetSymbolSummaryAsync for aggregated data");
         }
 
-        public async Task<IEnumerable<SymbolSummaryDto>> GetSymbolSummaryAsync()
-        {
-            var query = @" 
-                SELECT DISTINCT 
-                    symbol as Symbol,
-                    COUNT(*) as DataPoints,
-                    MIN(price_date) as FirstDate,     
-                    MAX(price_date) as LastDate
-                FROM etf_prices 
-                GROUP BY symbol
-                ORDER BY symbol";
+        // public async Task<IEnumerable<SymbolSummaryDto>> GetSymbolSummaryAsync()
+        // {
+        //     var query = @" 
+        //         SELECT DISTINCT 
+        //             symbol as Symbol,
+        //             COUNT(*) as DataPoints,
+        //             MIN(price_date) as FirstDate,     
+        //             MAX(price_date) as LastDate
+        //         FROM etf_prices 
+        //         GROUP BY symbol
+        //         ORDER BY symbol";
 
-            var results = await _db.QueryAsync<SymbolSummary>(query);
+        //     var results = await _db.QueryAsync<SymbolSummary>(query);
 
-            return results.Select(item => new SymbolSummaryDto
-            {
-                Symbol = item.Symbol,
-                DataPoints = item.DataPoints,
-                FirstDate = item.FirstDate,
-                LastDate = item.LastDate
-            }).ToList();
-        }
+        //     return results.Select(item => new SymbolSummaryDto
+        //     {
+        //         Symbol = item.Symbol,
+        //         DataPoints = item.DataPoints,
+        //         FirstDate = item.FirstDate,
+        //         LastDate = item.LastDate
+        //     }).ToList();
+        // }
 
         public Task AddEtfAsync(Etf etf)
         {
@@ -126,6 +126,11 @@ namespace EtfInsight.Infrastructure.Repositories
         }
 
         public Task<LatestSymbolPriceDto?> GetLatestEtfBySymbolAsync(string ticker)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<IEnumerable<SymbolSummaryDto>> GetSymbolSummaryAsync()
         {
             throw new NotImplementedException();
         }

@@ -23,6 +23,5 @@ values
 	('VWCE.DE', NULL, 'Global ETF equity EUR (Acc)', True, NOW(), NULL),
 	('QDVE.DE', NULL, 'USA Technological sector', True, NOW(), NULL),
 	('EIMI.MI', NULL, 'Emergent Markets', True, NOW(), NULL),
-	('CSPX.MI', NULL, 'S&P 500', True, NOW(), NULL),
 	('VUSA.MI', NULL, 'S&P 500 index replica', True, NOW(), NULL),
 	('AGGH.MI', NULL, 'Diversified Global Bond ', True, NOW(), NULL)

@@ -9,7 +9,7 @@ using EtfInsight.Core.Interfaces;
 
 namespace EtfInsight.Infrastructure.Repositories
 {
-    public class DapperEtfPriceRepository : IEtfPriceRepository
+    public class DapperEtfPriceRepository : EtfInsight.Core.Interfaces.IEtfPriceRepository
     {
         private readonly IDbConnection _db;
 

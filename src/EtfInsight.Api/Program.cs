@@ -91,6 +91,13 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
     Authorization = new[] { new EtfInsight.Api.Filters.AllowAllDashboardAuthorizationFilter() }
 });
 
+// Hangfire recurring job setup 
+RecurringJob.AddOrUpdate<DataQualityScanner>(
+    "nightly-data-quality-scan",
+    scanner => scanner.ScanRecentPricesAsync(),
+    Cron.Daily(2) // Every day at 2:00 AM
+);
+
 // Request logging middleware
 app.Use(async (context, next) =>
 {

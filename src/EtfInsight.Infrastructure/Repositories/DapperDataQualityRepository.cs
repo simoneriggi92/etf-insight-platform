@@ -90,7 +90,9 @@ namespace EtfInsight.Infrastructure.Repositories
                     @Id, @Ticker, @PriceDate, @RuleName, @Severity,
                     @CurrentValue, @ExpectedRange, @Message,
                     @Metadata::jsonb, @DetectedAt, @Resolved
-                )";
+                )
+                ON CONFLICT (ticker, price_date, rule_name) DO NOTHING"
+            ;
 
             await _db.ExecuteAsync(query, new
             {

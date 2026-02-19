@@ -60,6 +60,22 @@ builder.Services.Configure<DataQualitySettings>(
     builder.Configuration.GetSection(DataQualitySettings.SectionName)
 );
 
+const string DevCorsPolicy = "DevFrontend";
+
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? Array.Empty<string>();
+
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(DevCorsPolicy, policy => policy
+        .WithOrigins(allowedOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials());
+});
+
 builder.Services.AddScoped<IDbConnection>(_ => new Npgsql.NpgsqlConnection(connectionString));
 builder.Services.AddScoped<IFxRateService, FxRateService>();
 builder.Services.AddScoped<IEtfRepository, PostgresRepository>();
@@ -80,6 +96,7 @@ builder.Services.AddScoped<EtfInsight.DataQuality.Interfaces.IEtfPriceRepository
 
 // Data Quality - Register scanner
 builder.Services.AddScoped<DataQualityScanner>();
+
 
 var app = builder.Build();
 
@@ -126,6 +143,7 @@ app.Use(async (context, next) =>
     }
 });
 
+app.UseCors(DevCorsPolicy);
 
 // Configure middleware
 if (app.Environment.IsDevelopment())

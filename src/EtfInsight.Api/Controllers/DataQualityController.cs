@@ -7,6 +7,8 @@ using EtfInsight.Core.Services;
 using EtfInsight.DataQuality.Interfaces;
 using EtfInsight.DataQuality.Services;
 using Microsoft.Extensions.Logging;
+using Hangfire;
+using Hangfire.PostgreSql;
 
 namespace EtfInsight.Api.Controllers
 {
@@ -15,55 +17,38 @@ namespace EtfInsight.Api.Controllers
     [Produces("application/json")]
     public class DataQualityController : ControllerBase
     {
-        private readonly DataQualityScanner _scanner;
+        private readonly IBackgroundJobClient _jobs;
         private readonly IDataQualityRepository _repository;
         private readonly ILogger<DataQualityController> _logger;
 
         public DataQualityController(
-            DataQualityScanner scanner,
+            IBackgroundJobClient jobs,
             IDataQualityRepository repository,
             ILogger<DataQualityController> logger)
         {
-            _scanner = scanner;
+            _jobs = jobs;
             _repository = repository;
             _logger = logger;
         }
 
         /// <summary>
-        /// Trigger data quality scan manually. 
+        /// Enqueue fire-and-forget data quality scan job.
+        /// Returns 202 Accepted immediately; Hangfire will process the scan in the background
         /// </summary>
         /// <returns></returns>
         [HttpPost("scan")]
-        public async Task<IActionResult> Scan()
+        public IActionResult Scan()
         {
-            _logger.LogInformation("Manual data quality scan triggered.");
+            _logger.LogInformation("Data quality scan enqueued.");
 
-            try
+            var jobId = _jobs.Enqueue<DataQualityScanner>(service => service.ScanRecentPricesAsync());
+
+            return Accepted(new
             {
-                var result = await _scanner.ScanRecentPricesAsync();
-                return Ok(new
-                {
-                    success = true,
-                    message = "Data quality scan completed.",
-                    stats = new
-                    {
-                        pricesChecked = result.PricesChecked,
-                        rulesExecuted = result.RulesExecuted,
-                        anomaliesDetected = result.AnomaliesDetected,
-                        errors = result.Errors,
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error occurred during data quality scan.");
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = "An error occurred while performing the data quality scan.",
-                    error = ex.Message
-                });
-            }
+                success = true,
+                message = "Data quality scan has been enqueued and will run shortly.",
+                jobId = jobId
+            });
         }
 
         /// <summary>

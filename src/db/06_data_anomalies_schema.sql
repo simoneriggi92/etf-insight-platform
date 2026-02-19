@@ -15,6 +15,14 @@ CREATE TABLE IF NOT EXISTS public.data_anomalies(
     resolved_by VARCHAR(50)
 );
 
+-- Idempotency constraint for data_anomalies.
+-- Ensures that re-running a scan (e.g. Hangfire retry) never produces duplicate anomalies
+-- for the same ticker + date + rule combination.
+
+ALTER TABLE data_anomalies
+    ADD CONSTRAINT uq_anomaly_ticker_date_rule
+    UNIQUE (ticker, price_date, rule_name);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_data_anomalies_ticker_date
     ON public.data_anomalies USING btree

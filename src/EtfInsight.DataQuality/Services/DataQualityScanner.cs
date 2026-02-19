@@ -8,6 +8,7 @@ using EtfInsight.DataQuality.Entities;
 using EtfInsight.DataQuality.Interfaces;
 using EtfInsight.DataQuality.Models;
 using Microsoft.Extensions.Logging;
+using Hangfire;
 
 namespace EtfInsight.DataQuality.Services
 {
@@ -30,6 +31,10 @@ namespace EtfInsight.DataQuality.Services
             _priceRepository = priceRepository;
         }
 
+        // Let's limit the scan to 3 tries. If it fails, waits log(attempts) in a default way
+        // or we can implement a custom backoff strategy if needed.
+        // LogEvents = true, it will log the exception details and the retry attempt number, which can be helpful for monitoring and debugging purposes.
+        [AutomaticRetry(Attempts = 3, LogEvents = true, OnAttemptsExceeded = AttemptsExceededAction.Fail)]
         public async Task<ScanResult> ScanRecentPricesAsync()
         {
             _logger.LogInformation("Starting data quality scan....");

@@ -20,6 +20,7 @@ namespace EtfInsight.Api.Controllers
     [Produces("application/json")]
     public class HealthCheckController : ControllerBase
     {
+        private record EtfDocumentSample(string Ticker, int Dims);
         private readonly ILogger<HealthCheckController> _logger;
 
         public HealthCheckController(ILogger<HealthCheckController> logger)
@@ -76,7 +77,7 @@ namespace EtfInsight.Api.Controllers
                 var count = await Dapper.SqlMapper.QueryFirstOrDefaultAsync<int>(
                     connection, "SELECT COUNT(*) FROM etf_documents");
 
-                var sample = await Dapper.SqlMapper.QueryAsync<dynamic>(
+                var sample = await Dapper.SqlMapper.QueryAsync<EtfDocumentSample>(
                     connection,
                     "SELECT ticker, vector_dims(embedding) as dims FROM etf_documents LIMIT 5");
 

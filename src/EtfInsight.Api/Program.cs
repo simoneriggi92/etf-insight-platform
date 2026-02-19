@@ -13,6 +13,9 @@ using EtfInsight.DataQuality.Models;
 using EtfInsight.DataQuality.Interfaces;
 using EtfInsight.DataQuality.Rules;
 using EtfInsight.DataQuality.Services;
+using Hangfire;
+using Hangfire.PostgreSql;
+using EtfInsight.Api.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,18 +32,33 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// Database connection
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Host=localhost;Port=5432;Database=etfinsight;Username=etfinsight;Password=devpassword123";
+
+builder.Services.AddHttpClient("Ollama");
+
+// Hangfire configuration
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(o => o.UseNpgsqlConnection(connectionString))
+);
+
+// Add the worker for fire-and-forget jobs
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = 2;
+    options.ServerName = "etf-insight-bgserver";
+});
+
 builder.Services.Configure<AISettings>(builder.Configuration.GetSection("AI"));
 
 // Data Quality Settings
 builder.Services.Configure<DataQualitySettings>(
     builder.Configuration.GetSection(DataQualitySettings.SectionName)
 );
-
-builder.Services.AddHttpClient("Ollama");
-
-// Database connection
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Host=localhost;Port=5432;Database=etfinsight;Username=etfinsight;Password=devpassword123";
 
 builder.Services.AddScoped<IDbConnection>(_ => new Npgsql.NpgsqlConnection(connectionString));
 builder.Services.AddScoped<IFxRateService, FxRateService>();
@@ -64,6 +82,14 @@ builder.Services.AddScoped<EtfInsight.DataQuality.Interfaces.IEtfPriceRepository
 builder.Services.AddScoped<DataQualityScanner>();
 
 var app = builder.Build();
+
+// Hangfire dashboard (optional, for monitoring background jobs)
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    // Dev-only: allows all requests (required when running behind Docker/reverse proxy).
+    // Replace with a role-based filter in production.
+    Authorization = new[] { new EtfInsight.Api.Filters.AllowAllDashboardAuthorizationFilter() }
+});
 
 // Request logging middleware
 app.Use(async (context, next) =>

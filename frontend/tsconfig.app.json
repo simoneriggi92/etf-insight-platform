@@ -9,6 +9,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },

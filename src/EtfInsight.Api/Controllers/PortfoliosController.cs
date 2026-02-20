@@ -41,17 +41,8 @@ public class PortfoliosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll()
     {
-        var query = @"
-            SELECT p.id, p.name, p.description, p.base_currency, p.created_at,
-                COUNT(t.id) as transaction_count,
-                MIN(t.transaction_date) as first_transaction_date,
-                MAX(t.transaction_date) as last_transaction_date
-            FROM portfolios p
-            LEFT JOIN transactions t on p.id = t.portfolio_id
-            GROUP BY p.id, p.name, p.description, p.base_currency, p.created_at
-            ORDER BY p.created_at DESC";
+        var portfolios = await _portfolioRepository.GetAllPortfoliosWithTransactionsAsync();
 
-        var portfolios = await _db.QueryAsync(query);
         return Ok(portfolios);
     }
 

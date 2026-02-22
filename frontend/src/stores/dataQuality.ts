@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { dataQualityApi } from '../api/dataQuality'
-import type { DataAnomaly, Severity } from './../types/index';
+import type { DataAnomaly, Severity } from '../types/index'
 
 export const useDataQualityStore = defineStore('dataQuality', () => {
 
@@ -28,8 +28,8 @@ export const useDataQualityStore = defineStore('dataQuality', () => {
   })
   
   const unresolvedCount  = computed(() => anomalies.value.filter(a => !a.resolved).length)
-  const criticalCount    = computed(() => anomalies.value.filter(a => a.severity === Severity.ERROR).length)
-  const highCount        = computed(() => anomalies.value.filter(a => a.severity === Severity.WARNING).length)
+  const criticalCount    = computed(() => anomalies.value.filter(a => a.severity === 'ERROR').length)
+  const highCount        = computed(() => anomalies.value.filter(a => a.severity === 'WARNING').length)
   const resolvedCount    = computed(() => anomalies.value.filter(a => a.resolved).length)
 
   const recentAnomalies = computed(() =>

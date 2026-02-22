@@ -18,11 +18,6 @@ const router = createRouter({
           component: () => import('../views/PortfoliosView.vue'),
         },
         {
-          path: 'ai-advisor',
-          name: 'ai-advisor',
-          component: () => import('../views/AiAdvisorView.vue'),
-        },
-        {
           path: 'data-quality',
           name: 'data-quality',
           component: () => import('../views/DataQualityView.vue'),

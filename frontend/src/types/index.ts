@@ -39,21 +39,54 @@ export interface EtfPrice {
   source: string | null
 }
 
-// ── Portfolios ───────────────────────────────────────────────────────────────
+// ...existing code...
+
+// ── Portfolios ────────────────────────────────────────────────────────────────
+
+export type TransactionType = 'BUY' | 'SELL' | 'DEPOSIT' | 'WITHDRAW'
+
+export interface Transaction {
+  id: string
+  portfolioId: string
+  ticker: string
+  type: TransactionType
+  units: number
+  pricePerUnit: number
+  fees: number
+  transactionDate: string   // DateOnly → "YYYY-MM-DD"
+  notes: string | null
+}
 
 export interface Portfolio {
   id: string
   name: string
   createdAt: string
+  transactions: Transaction[]
 }
 
-export interface PortfolioHolding {
-  id: string
+// ── Portfolio Analytics (GET /api/Portfolios/{id}/analytics/dashboard) ────────
+
+export interface DailyValuationPoint {
+  date: string              // DateOnly → "YYYY-MM-DD"
+  totalValue: number
+  netFlow: number
+  cumulativeNetFlow: number
+  pnL: number
+  return: number
+  peak: number
+  drawdown: number
+  dailyChangePercentage: number
+}
+
+export interface PortfolioDashboardDto {
   portfolioId: string
-  ticker: string
-  quantity: number
-  purchasePrice: number
-  purchaseDate: string
+  referenceDate: string
+  currentTotalValue: number
+  totalInvested: number
+  absolutePnL: number
+  simpleReturn: number      // decimal e.g. 0.087 = 8.7%
+  maxDrawdown: number       // decimal e.g. -0.12 = -12%
+  history: DailyValuationPoint[]
 }
 
 // ── Health ───────────────────────────────────────────────────────────────────
@@ -72,4 +105,33 @@ export interface KpiCard {
   value: string
   sub?: string
   trend?: 'up' | 'down' | 'neutral'
+}
+
+
+
+// ── AI Advisor ────────────────────────────────────────────────────────────────
+
+export interface AiSource {
+  ticker: string
+  excerpt: string
+  similarity: number
+}
+
+export interface AiQueryRequest {
+  question: string
+}
+
+export interface AiQueryResponse {
+  question: string
+  answer: string
+  sources: AiSource[],
+  timestamp: string
+}
+
+export interface AiMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  sources?: AiSource[]
+  timestamp: string
 }

@@ -7,7 +7,6 @@ const route = useRoute()
 const navItems = [
   { to: '/',             label: 'Dashboard',    icon: '⬛' },
   { to: '/portfolios',   label: 'Portfolios',   icon: '📊' },
-  { to: '/ai-advisor',  label: 'AI Advisor',   icon: '🤖' },
   { to: '/data-quality', label: 'Data Quality', icon: '🛡️' },
 ]
 

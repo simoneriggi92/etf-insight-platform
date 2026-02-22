@@ -92,8 +92,8 @@ The project follows a strict **6-Month Architectural Roadmap**.
 - [x] Data validation logic (Specification Pattern).
 
 ### ⏳ Phase 5: Event-Driven Architecture (Month 5)
-- [ ] Background jobs (Hangfire/Quartz).
-- [ ] Asynchronous ingestion pipeline.
+- [x] Background jobs (Hangfire/Quartz).
+- [x] Asynchronous ingestion pipeline.
 
 ### ⏳ Phase 6: Scale & UI (Month 6)
 - [ ] Frontend dashboard.

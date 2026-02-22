@@ -38,8 +38,9 @@ watch(() => ai.messages.length, async () => {
   <Transition name="slide">
     <div
       v-if="ai.isOpen"
-      class="fixed bottom-20 right-4 z-50 w-96 h-[560px] flex flex-col
-             rounded-2xl border border-border bg-card shadow-2xl overflow-hidden"
+      class="fixed z-50 flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden
+             inset-4
+             sm:inset-auto sm:bottom-20 sm:right-4 sm:w-96 sm:h-[560px]"
     >
       <!-- Header -->
       <div class="flex items-center justify-between px-4 py-3 border-b border-border bg-card">

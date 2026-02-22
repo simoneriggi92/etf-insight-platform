@@ -38,11 +38,11 @@ onMounted(() =>{
 
     <template v-else>
       <!-- Tabs -->
-      <div class="flex gap-2 mb-6 border-b border-border">
+      <div class="flex gap-2 border-b border-border overflow-x-auto">
         <button
           v-for="p in store.portfolios"
           :key="p.id"
-          class="px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px"
+          class="whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px shrink-0"
           :class="store.activeId === p.id
             ? 'border-primary text-foreground'
             : 'border-transparent text-muted-foreground hover:text-foreground'"
@@ -50,21 +50,22 @@ onMounted(() =>{
         >
           {{ p.name }}
         </button>
+      </div>
 
-        <!-- Date range -->
-        <div class="ml-auto flex items-center gap-2 pb-2">
-          <input type="date" v-model="store.dateFrom"
-            class="text-xs bg-card border border-border rounded px-2 py-1 text-foreground" />
-          <span class="text-muted-foreground text-xs">→</span>
-          <input type="date" v-model="store.dateTo"
-            class="text-xs bg-card border border-border rounded px-2 py-1 text-foreground" />
-          <button
-            class="text-xs px-3 py-1 bg-primary text-primary-foreground rounded font-medium"
-            @click="store.activeId && store.applyDateRange(store.dateFrom, store.dateTo)"
-          >
-            Apply
-          </button>
-        </div>
+      <!-- Date range — own row, wraps nicely on all widths -->
+      <div class="flex flex-wrap items-center gap-2 mt-3 mb-6">
+        <span class="text-xs text-muted-foreground">From</span>
+        <input type="date" v-model="store.dateFrom"
+          class="text-xs bg-card border border-border rounded px-2 py-1 text-foreground min-w-0" />
+        <span class="text-muted-foreground text-xs">→</span>
+        <input type="date" v-model="store.dateTo"
+          class="text-xs bg-card border border-border rounded px-2 py-1 text-foreground min-w-0" />
+        <button
+          class="text-xs px-3 py-1 bg-primary text-primary-foreground rounded font-medium"
+          @click="store.activeId && store.applyDateRange(store.dateFrom, store.dateTo)"
+        >
+          Apply
+        </button>
       </div>
 
       <!-- KPIs -->

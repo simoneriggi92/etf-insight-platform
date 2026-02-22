@@ -12,14 +12,16 @@ onMounted(() => store.fetchAnomalies())
 <template>
   <div>
     <!-- Header -->
-    <div class="flex items-start justify-between mb-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
       <div>
         <h2 class="text-2xl font-bold tracking-tight">Data Quality</h2>
         <p class="text-muted-foreground text-sm mt-1">
           System monitoring · anomaly detection · Hangfire jobs
         </p>
       </div>
-      <ScanTriggerButton />
+      <div class="shrink-0">
+        <ScanTriggerButton />
+      </div>
     </div>
 
     <!-- Stats row -->

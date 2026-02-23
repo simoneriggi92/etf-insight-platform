@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { portfoliosApi } from '../api/portfolios'
-import type { Portfolio, PortfolioDashboardDto } from '../types'
+import type { Portfolio, PortfolioDashboardDto, PortfolioSummaryDto } from '../types'
 
 // Default date range: YTD
 const today    = () => new Date().toISOString().substring(0, 10)
@@ -13,6 +13,7 @@ export const usePortfoliosStore = defineStore('portfolios', () => {
   const portfolios   = ref<Portfolio[]>([])
   const activeId     = ref<string | null>(null)
   const dashboard    = ref<PortfolioDashboardDto | null>(null)
+  const summary     = ref<PortfolioSummaryDto | null>(null)
   const loading      = ref(false)
   const error        = ref<string | null>(null)
   const dateFrom     = ref<string>(ytdStart())
@@ -36,7 +37,10 @@ export const usePortfoliosStore = defineStore('portfolios', () => {
       const first = data[0]
       if (first && !activeId.value) {
         activeId.value = first.id
-        await fetchDashboard(first.id)
+        await Promise.all([
+          fetchDashboard(first.id),
+          fetchPortfolioSummary(first.id),
+        ])
       }
     } catch (e) {
       error.value = 'Failed to load portfolios.'
@@ -61,21 +65,41 @@ async function fetchDashboard(id: string) {
     }
   }
 
+  async function fetchPortfolioSummary(id: string) {
+    loading.value = true
+    error.value   = null
+    try{
+      const { data } = await portfoliosApi.getSummary(id, dateFrom.value, dateTo.value)
+      summary.value = data
+    } catch (e) {
+      error.value = 'Failed to load portfolio summary.'
+      console.error(e)
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function selectPortfolio(id: string) {
     activeId.value = id
-    await fetchDashboard(id)
+    await Promise.all([
+      fetchDashboard(id),
+      fetchPortfolioSummary(id),
+    ])
   }
 
   async function applyDateRange(from: string, to: string) {
     dateFrom.value = from
     dateTo.value   = to
-    if (activeId.value) await fetchDashboard(activeId.value)
+    if (activeId.value) await Promise.all([
+      fetchDashboard(activeId.value),
+      fetchPortfolioSummary(activeId.value),
+    ])
   }
 
   return {
-    portfolios, activeId, dashboard, loading, error,
+    portfolios, activeId, dashboard, summary, loading, error,
     dateFrom, dateTo,
     activePortfolio, history,
-    fetchPortfolios, fetchDashboard, selectPortfolio, applyDateRange,
+    fetchPortfolios, fetchDashboard, fetchPortfolioSummary, selectPortfolio, applyDateRange,
   }
 })

@@ -89,6 +89,13 @@ export interface PortfolioDashboardDto {
   history: DailyValuationPoint[]
 }
 
+export interface PortfolioSummaryDto {
+  portfolioId:       string
+  twrrYtd:           number   // raw decimal, e.g. 0.0523
+  twrrYtdPercentage: string   // formatted string, e.g. "5.23%"
+  analysisPeriod:    { from: string; to: string }
+}
+
 // ── Health ───────────────────────────────────────────────────────────────────
 
 export interface HealthStatus {

@@ -2,6 +2,7 @@
 import { onMounted, computed } from 'vue'
 import KpiCard from '../components/dashboard/KpiCard.vue'
 import RecentAnomaliesTable from '../components/dashboard/RecentAnomaliesTable.vue'
+import PortfolioValueChart from '../components/portfolios/PortfolioValueChart.vue'
 import { useDataQualityStore } from '../stores/dataQuality'
 import { usePortfoliosStore } from '../stores/portfolios'
 
@@ -24,9 +25,13 @@ const kpis = computed(() => [
   },
   {
     label: 'TWRR YTD',
-    value: '—',
-    sub:   'Coming in Portfolios view',
-    trend: 'neutral' as const,
+    value: portStore.summary ? portStore.summary.twrrYtdPercentage : '—',
+    sub:   portStore.summary
+      ? `${portStore.summary.analysisPeriod.from} → ${portStore.summary.analysisPeriod.to}`
+      : 'Year to date',
+    trend: portStore.summary
+      ? (portStore.summary.twrrYtd >= 0 ? 'up' : 'down') as 'up' | 'down'
+      : 'neutral' as const,
   },
   {
     label: 'Open Anomalies',
@@ -56,13 +61,8 @@ const kpis = computed(() => [
       />
     </div>
 
-    <!-- Chart placeholder (ECharts will go here) -->
-    <div class="rounded-xl border border-border bg-card p-6 mb-8
-                flex items-center justify-center h-52">
-      <p class="text-muted-foreground text-sm">
-        Portfolio value chart · wired once TWRR endpoint is ready
-      </p>
-    </div>
+    <!-- Portfolio value chart -->
+    <PortfolioValueChart class="mb-8" />
 
     <!-- Recent anomalies -->
     <RecentAnomaliesTable />

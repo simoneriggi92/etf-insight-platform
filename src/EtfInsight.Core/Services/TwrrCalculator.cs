@@ -3,134 +3,135 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EtfInsight.Core.Entities;
+using EtfInsight.Core.Interfaces;
 
 namespace EtfInsight.Core.Services
 {
     public class TwrrCalculator : IPerformanceCalculator
     {
-        public decimal CalculateTWRR(IEnumerable<Transaction> transactions, IEnumerable<EtfPrice> etfPrices)
+        private readonly IPortfolioRepository? _portfolioRepo;
+        private readonly IEtfPriceRepository? _priceRepo;
+
+        /// <summary>Parameterless constructor for unit-testing with pre-loaded data.</summary>
+        public TwrrCalculator() { }
+
+        /// <summary>Production constructor — resolves data from repositories.</summary>
+        public TwrrCalculator(
+            IPortfolioRepository portfolioRepo,
+            IEtfPriceRepository priceRepo)
         {
-            // input validation
-            var transactionList = transactions.OrderBy(t => t.TransactionDate).ToList();
-            if (!transactionList.Any())
-            {
-                return 0m;
-            }
+            _portfolioRepo = portfolioRepo;
+            _priceRepo = priceRepo;
+        }
 
-            var priceList = etfPrices.OrderBy(p => p.PriceDate).ToList();
-            if (!priceList.Any())
-            {
-                return 0m;
-            }
+        // ── IPerformanceCalculator (repo-based) ────────────────────────────────
+        public async Task<decimal> CalculateTWRR(Guid portfolioId, DateOnly from, DateOnly to)
+        {
+            if (_portfolioRepo is null || _priceRepo is null)
+                throw new InvalidOperationException(
+                    "Repository constructor must be used when calling the async overload.");
 
-            //STEP 1: Find the date range (minimum = first transaction date, maximum = last price date)
-            var minDate = transactionList.First().TransactionDate;
-            var maxDate = priceList.Last().PriceDate;
+            var portfolio = await _portfolioRepo.GetPortfolioWithTransactionsAsync(portfolioId);
+            if (portfolio == null || !portfolio.Transactions.Any())
+                return 0m;
+
+            var allTransactions = portfolio.Transactions
+                .Where(t => t.TransactionDate <= to)
+                .OrderBy(t => t.TransactionDate)
+                .ToList();
+
+            if (!allTransactions.Any())
+                return 0m;
+
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var effectiveTo = to > today ? today : to;
 
-            if (maxDate > today)
-            {
-                maxDate = today;
-            }
+            var tickers = allTransactions.Select(t => t.Ticker).Distinct().ToList();
+            var prices = await _priceRepo.GetPricesByTickersAsync(tickers, from, effectiveTo);
 
-            // STEP 2: Build price lookup dictionary for quick access [Ticker][Date] => Price
+            return CalculateTWRR(allTransactions, prices);
+        }
+
+        // ── Pure overload — accepts pre-loaded data (used by unit tests) ───────
+        public decimal CalculateTWRR(
+            IEnumerable<Transaction> transactions,
+            IEnumerable<EtfPrice> prices)
+        {
+            var transactionList = (transactions ?? Enumerable.Empty<Transaction>())
+                .OrderBy(t => t.TransactionDate)
+                .ToList();
+
+            var priceList = (prices ?? Enumerable.Empty<EtfPrice>()).ToList();
+
+            if (!transactionList.Any())
+                return 0m;
+
+            var minDate = transactionList.First().TransactionDate;
+            var maxDate = priceList.Any()
+                ? priceList.Max(p => p.PriceDate)
+                : minDate;
+
+            // Build price lookup [Ticker][Date] => ClosePrice
             var priceLookup = priceList
-            .GroupBy(p => p.Ticker)
-            .ToDictionary(
-                g => g.Key,
-                g => g.ToDictionary(p => p.PriceDate, p => p.ClosePrice)
-            );
+                .GroupBy(p => p.Ticker)
+                .ToDictionary(g => g.Key, g => g.ToDictionary(p => p.PriceDate, p => p.ClosePrice));
 
-
-            // STEP 3: Group transactions by date for efficient daily lookup
+            // Group transactions by date
             var transactionsByDate = transactionList
                 .GroupBy(t => t.TransactionDate)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            // Initialize holdings tracker: [Ticker] => Units Held
             var holdings = new Dictionary<string, decimal>();
-
-            // Initialize last known prices for handling missing price data
             var lastKnownPrices = new Dictionary<string, decimal>();
-
-            // Initialize TWRR calculation variables
             decimal totalReturn = 0m;
             decimal previousDayValue = 0m;
             var currentDate = minDate;
 
-            // STEP 2: Daily Iteration from minDate to maxDate
             while (currentDate <= maxDate)
             {
-                // STEP 3: Calculate portfolio value before cash flows (valueStart)
-                // Use yesterday's ending value, NOT recalculated with today's prices
                 decimal valueStart = previousDayValue;
-
-                // STEP 4: Process cash flows (transactions) for the day
                 decimal cashFlow = 0m;
 
-                if (transactionsByDate.ContainsKey(currentDate))
+                if (transactionsByDate.TryGetValue(currentDate, out var dayTx))
                 {
-                    foreach (var transaction in transactionsByDate[currentDate])
+                    foreach (var tx in dayTx)
                     {
-                        // Ensure ticker exists in holdings
-                        if (!holdings.ContainsKey(transaction.Ticker))
-                        {
-                            holdings[transaction.Ticker] = 0m;
-                        }
+                        holdings.TryAdd(tx.Ticker, 0m);
 
-                        // Update holdings based on transaction type
-                        switch (transaction.Type)
+                        switch (tx.Type)
                         {
                             case TransactionType.BUY:
-                                // External cash in: buy adds units
-                                holdings[transaction.Ticker] += transaction.Units;
-                                cashFlow += transaction.Units * transaction.PricePerUnit + transaction.Fees;
+                                holdings[tx.Ticker] += tx.Units;
+                                cashFlow += tx.Units * tx.PricePerUnit + tx.Fees;
                                 break;
-
                             case TransactionType.SELL:
-                                // External cash out: sell removes units
-                                holdings[transaction.Ticker] -= transaction.Units;
-                                cashFlow -= (transaction.Units * transaction.PricePerUnit + transaction.Fees);
+                                holdings[tx.Ticker] -= tx.Units;
+                                cashFlow -= tx.Units * tx.PricePerUnit + tx.Fees;
                                 break;
-
                             case TransactionType.DEPOSIT:
-                                // Pure cash deposit (no units change, just cash in), use PricePerUnit as amount
-                                cashFlow += transaction.PricePerUnit;
+                                cashFlow += tx.PricePerUnit;
                                 break;
-
                             case TransactionType.WITHDRAW:
-                                // Pure cash withdrawal (no units change, just cash out), use PricePerUnit as amount
-                                cashFlow -= transaction.PricePerUnit;
+                                cashFlow -= tx.PricePerUnit;
                                 break;
                         }
                     }
                 }
 
-                // Recalculate valueEnd after processing transactions using updated holdings
                 decimal valueEnd = 0m;
-                foreach (var ticker in holdings.Keys)
+                foreach (var (ticker, units) in holdings)
                 {
-                    var units = holdings[ticker];
-                    if (units == 0) continue;
-
-                    decimal todayPrice = GetPriceForDate(ticker, currentDate, priceLookup, lastKnownPrices);
-                    valueEnd += units * todayPrice;
+                    if (units == 0m) continue;
+                    valueEnd += units * GetPriceForDate(ticker, currentDate, priceLookup, lastKnownPrices);
                 }
-                // STEP 5: Calaculate sub-period return for the day
-                // Formula rn = (valueEnd - cashFlow) / valueStart - 1
-                // Simplified when no cash flows: rn. = (todayPrice / yesterdayPrice) - 1
+
                 if (valueStart > 0)
                 {
-                    decimal subPeriodReturn = ((valueEnd - cashFlow) / valueStart) - 1;
-
-                    // STEP 6: Aggregate sub-period returns into TotalReturn
-                    totalReturn = (1 + totalReturn) * (1 + subPeriodReturn) - 1;
+                    decimal subPeriodReturn = (valueEnd - cashFlow) / valueStart - 1m;
+                    totalReturn = (1m + totalReturn) * (1m + subPeriodReturn) - 1m;
                 }
 
-                // Save today's ending value for tomorrow's starting value
                 previousDayValue = valueEnd;
-
-                // Move to next day
                 currentDate = currentDate.AddDays(1);
             }
 

@@ -14,6 +14,6 @@ namespace EtfInsight.Core.Services
         /// <param name="transactions"></param>
         /// <param name="etfPrices"></param>
         /// <returns></returns>
-        public decimal CalculateTWRR(IEnumerable<Transaction> transactions, IEnumerable<EtfPrice> etfPrices);
+        public Task<decimal> CalculateTWRR(Guid portfolioId, DateOnly from, DateOnly to);
     }
 }

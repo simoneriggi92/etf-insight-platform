@@ -9,5 +9,7 @@ namespace EtfInsight.Core.Interfaces
     public interface IPortfolioRepository
     {
         Task<Portfolio?> GetPortfolioWithTransactionsAsync(Guid id);
+
+        Task<IEnumerable<Portfolio>> GetAllPortfoliosWithTransactionsAsync();
     }
 }

@@ -491,6 +491,11 @@ namespace EtfInsight.Tests.Services
 
         public Task<Portfolio?> GetPortfolioWithTransactionsAsync(Guid id)
             => Task.FromResult(_portfolio);
+
+        public Task<IEnumerable<Portfolio>> GetAllPortfoliosWithTransactionsAsync()
+            => Task.FromResult(_portfolio is null
+                ? Enumerable.Empty<Portfolio>()
+                : new[] { _portfolio }.AsEnumerable());
     }
 
     internal class MockEtfPriceRepository : IEtfPriceRepository
@@ -514,9 +519,7 @@ namespace EtfInsight.Tests.Services
 
     internal class MockPerformanceCalculator : IPerformanceCalculator
     {
-        public decimal CalculateTWRR(
-            IEnumerable<Transaction> transactions,
-            IEnumerable<EtfPrice> etfPrices)
-            => 0m; // Not used in analytics tests
+        public Task<decimal> CalculateTWRR(Guid portfolioId, DateOnly from, DateOnly to)
+            => Task.FromResult(0m); // Not used in analytics tests
     }
 }

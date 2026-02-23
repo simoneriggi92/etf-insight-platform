@@ -21,10 +21,8 @@ namespace EtfInsight.Core.Services
             _priceRepo = priceRepo;
         }
 
-        public decimal CalculateTWRR(IEnumerable<Transaction> transactions, IEnumerable<EtfPrice> etfPrices)
-        {
-            return _performanceCalculator.CalculateTWRR(transactions, etfPrices);
-        }
+        public Task<decimal> CalculateTWRR(Guid portfolioId, DateOnly from, DateOnly to)
+            => _performanceCalculator.CalculateTWRR(portfolioId, from, to);
 
         public async Task<PortfolioDashboardDto> GetPortfolioAnalyticsAsync(Guid portfolioId, DateOnly from, DateOnly to)
         {

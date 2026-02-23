@@ -240,62 +240,32 @@ public class PortfoliosController : ControllerBase
     }
 
     /// <summary>
-    /// Get portfolio performance
+    /// Get portfolio TWRR summary. Defaults to YTD (1 Jan of current year → today).
     /// </summary>
-
-    [HttpGet("{id}/analytics/performance")]
+    [HttpGet("{id}/analytics/summary")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPortfolioPerformance(
-    Guid id,
-    string? from,
-    string? to,
-    IPortfolioRepository repository,
-    IEtfPriceRepository etfPriceRepository,
-    IPerformanceCalculator performanceCalculator,
-    IDbConnection db)
+        Guid id,
+        [FromQuery] string? from,
+        [FromQuery] string? to)
     {
-        var portfolio = await repository.GetPortfolioWithTransactionsAsync(id);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var fromDate = from != null
+            ? DateOnly.Parse(from)
+            : new DateOnly(today.Year, 1, 1);   // 01/01/current-year
+        var toDate = to != null
+            ? DateOnly.Parse(to)
+            : today;
 
-        if (portfolio == null)
-        {
-            return NotFound(new ErrorResponse($"Portfolio with ID {id} not found."));
-        }
-
-        if (portfolio.Transactions == null || !portfolio.Transactions.Any())
-        {
-            return Ok(new
-            {
-                PortfolioId = id,
-                AnalysisPeriod = new { From = from ?? "2000-01-01", To = to ?? DateTime.UtcNow.ToString("yyyy-MM-dd") },
-                Twrr = 0m,
-                TwrrPercentage = "0.00%",
-                DataPoints = 0
-            });
-        }
-
-        var etfTickers = portfolio.Transactions
-            .Select(t => t.Ticker)
-            .Distinct()
-            .ToList();
-
-        var etfPrices = await etfPriceRepository.GetPricesByTickersAsync(
-            etfTickers,
-            DateOnly.Parse(from ?? "2000-01-01"),
-            DateOnly.Parse(to ?? DateTime.UtcNow.ToString("yyyy-MM-dd"))
-        );
-
-        var twrr = _portfolioAnalyticsService.CalculateTWRR(
-            portfolio.Transactions,
-                etfPrices);
+        var twrr = await _portfolioAnalyticsService.CalculateTWRR(id, fromDate, toDate);
 
         return Ok(new
         {
             portfolioId = id,
-            twrr = Math.Round(twrr, 4),
-            twrrPercentage = $"{Math.Round(twrr * 100, 2)}%",
-            dataPoints = etfPrices.Count(),
-            analysisPeriod = new { From = from ?? "2000-01-01", To = to ?? DateTime.UtcNow.ToString("yyyy-MM-dd") },
+            twrrYtd = Math.Round(twrr, 4),
+            twrrYtdPercentage = $"{Math.Round(twrr * 100, 2)}%",
+            analysisPeriod = new { From = fromDate.ToString("yyyy-MM-dd"), To = toDate.ToString("yyyy-MM-dd") },
         });
     }
 

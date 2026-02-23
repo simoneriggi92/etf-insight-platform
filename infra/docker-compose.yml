@@ -121,6 +121,22 @@ services:
       - etf-network
     restart: unless-stopped
     stop_grace_period: 30s # Wait up to 30 seconds for graceful shutdown
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: etf-frontend
+    ports:
+      - "3000:80"          # http://localhost:3000
+    depends_on:
+      - etf_api
+    networks:
+      - etf-network
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+
 networks:
   etf-network:
     driver: bridge

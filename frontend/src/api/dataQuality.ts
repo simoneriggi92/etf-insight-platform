@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { DataAnomaly, DataAnomalyResponse, ScanEnqueuedResponse } from '../types'
+import type { DataAnomalyResponse, ScanEnqueuedResponse } from '../types'
 
 export const dataQualityApi = {
   enqueueScan: () =>

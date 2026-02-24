@@ -51,7 +51,8 @@ graph TD
 ---
 
 ## 🧩 Key Components
-- Frontend SPA (Vue 3 + TypeScript)
+ 
+ ### Frontend SPA (Vue 3 + TypeScript)
 - Responsive, data-rich dashboard styled with Tailwind CSS and shadcn-vue. Served blazingly fast via Nginx.
 
 ### Core API (.NET 9)
@@ -73,38 +74,36 @@ graph TD
 
 ## 🗺️ Roadmap & Progress
 
-The project follows a strict **6-Month Architectural Roadmap**.
+🗺️ Roadmap & Progress
+The V1.0 of the project followed a strict 6-Month Architectural Roadmap, which is now fully completed.
 
-### ✅ Phase 1: Foundation (Month 1)
+### ✅ Phase 1-3: Foundation, Math & AI
 - [x] Dockerized environment (Python Scraper + Postgres + .NET API).
-- [x] Database schema design (financial strict types).
-- [x] Core domain entities (Portfolio, Transactions).
 
-### ✅ Phase 2: The Math Engine (Month 2)
-- [x] Implementation of TWRR (Time-Weighted Rate of Return).
-- [x] Handling of complex cash flows (Deposits, Withdrawals, Fees).
-- [x] Financial dashboard (PnL, Drawdown, Annualized Return).
-- [x] Unit testing validation against manual calculations.
+- [x] Implementation of TWRR (Time-Weighted Rate of Return) and cash flow handling.
 
-### ✅ Phase 3: The AI Brain (Month 3)
-- [x] Integration with Ollama (Local LLM).
-- [x] pgvector setup for embedding storage (768 dimensions).
-- [x] Semantic search engine ("Find ETFs about AI").
-- [x] RAG pipeline: chat with your financial data.
+- [x] Integration with Ollama (Local LLM) and pgvector for semantic search.
 
-### 🚧 Phase 4: Data Quality & Trust (Month 4) — In Progress
-- [x] Database auditing (time-travel queries).
-- [x] Anomaly detection (flash-crash protection).
-- [x] Data validation logic (Specification Pattern).
+- [x] RAG pipeline: Chat with your financial data.
 
-### ⏳ Phase 5: Event-Driven Architecture (Month 5)
-- [x] Background jobs (Hangfire/Quartz).
-- [x] Asynchronous ingestion pipeline.
+### ✅ Phase 4-6: Enterprise Trust, Scale & UI
+- [x] Database auditing (time-travel queries via SQL Triggers).
 
-### ⏳ Phase 6: Scale & UI (Month 6)
-- [ ] Frontend dashboard.
-- [ ] CI/CD pipelines.
-- [ ] Final architectural refactoring.
+- [x] Anomaly detection (flash-crash protection via Specification Pattern).
+
+- [x] Event-Driven Architecture: Background jobs and retry policies via Hangfire.
+
+- [x] Frontend SPA: Vue 3 + TypeScript dashboard.
+
+- [x] Production Infrastructure: Dockerized multi-stage builds with Nginx Reverse Proxy.
+
+### 🔮 V2 Vision: SaaS & Scale (Upcoming)
+- [] Data Engineering: Scaling ingestion from 50 to 5,000+ ETFs using Apache Airflow.
+
+- [] Multi-Tenancy: Row-Level Security (RLS) and user isolation.
+
+- [] Performance: Redis caching layer for heavy historical aggregations.
+
 
 ---
 
@@ -124,38 +123,22 @@ ollama pull llama3
 
 1) Clone the repo
 ```bash
-git clone https://github.com/your-username/ETFInsight.git
+git clone [https://github.com/simoneriggi92/ETFInsight.git](https://github.com/simoneriggi92/ETFInsight.git)
 cd ETFInsight
 ```
 
 2) Configure environment  
 Ensure your `.env` or `appsettings.json` points to the correct Docker host for Ollama (usually `host.docker.internal:11434`).
 
-3) Run with Docker Compose
+3) Run the Platform
 ```bash
-docker-compose up --build
+docker-compose up --build -d
 ```
 
 4) Access the system
-- **Swagger API**: `http://localhost:5000/swagger` (or port defined in `docker-compose`)
-- **Database**: `localhost:5432` (User/Pass in compose file)
-
----
-
-## 🧪 Testing the AI
-
-Once running, you can seed the vector database and chat with it:
-
-- **Seed embeddings**: `POST /api/search/seed`
-- **Ask a question**: `POST /api/chat`
-
-Example payload:
-```json
-{
-  "question": "Which ETFs are best for exposure to US Tech?"
-}
-```
-
+- Web App (UI): http://localhost:3000
+- Hangfire Dashboard: http://localhost:3000/api/hangfire (if exposed via proxy)
+- Swagger API: http://localhost:3000/api/swagger
 ---
 
 ## 📄 License

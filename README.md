@@ -47,7 +47,7 @@ graph TD
     
     Scraper[Python Ingestion] -->|INSERT| DB
     Scraper -->|Webhook Trigger| API
-
+```
 ---
 
 ## 🧩 Key Components

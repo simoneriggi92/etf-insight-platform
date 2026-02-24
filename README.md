@@ -98,11 +98,11 @@ The V1.0 of the project followed a strict 6-Month Architectural Roadmap, which i
 - [x] Production Infrastructure: Dockerized multi-stage builds with Nginx Reverse Proxy.
 
 ### 🔮 V2 Vision: SaaS & Scale (Upcoming)
-- [] Data Engineering: Scaling ingestion from 50 to 5,000+ ETFs using Apache Airflow.
+- [ ] Data Engineering: Scaling ingestion from 50 to 5,000+ ETFs using Apache Airflow.
 
-- [] Multi-Tenancy: Row-Level Security (RLS) and user isolation.
+- [ ] Multi-Tenancy: Row-Level Security (RLS) and user isolation.
 
-- [] Performance: Redis caching layer for heavy historical aggregations.
+- [ ] Performance: Redis caching layer for heavy historical aggregations.
 
 
 ---

@@ -123,7 +123,7 @@ ollama pull llama3
 
 1) Clone the repo
 ```bash
-git clone [https://github.com/simoneriggi92/ETFInsight.git](https://github.com/simoneriggi92/ETFInsight.git)
+git clone https://github.com/simoneriggi92/ETFInsight.git
 cd ETFInsight
 ```
 

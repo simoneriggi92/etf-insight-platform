@@ -4,16 +4,18 @@
 > **A modern financial platform combining rigorous performance analytics (TWRR) with Generative AI (RAG) to provide actionable investment insights.**
 
 ![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=flat&logo=dotnet)
+![Vue.js](https://img.shields.io/badge/Vue.js-3.0-4FC08D?style=flat&logo=vuedotjs)
+![Tailwind](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat&logo=tailwind-css)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker)
 ![AI](https://img.shields.io/badge/AI-Ollama%20%2B%20RAG-orange?style=flat)
-![Status](https://img.shields.io/badge/Status-Phase%204%3A%20Data%20Quality-yellow)
+![Status](https://img.shields.io/badge/Status-V1.0%20Release-brightgreen)
 
 ---
 
 ## 💡 Overview
 
-**ETFInsight** is not just a portfolio tracker. It is a distributed system designed to bridge the gap between **Quantitative Finance** and **Semantic AI**.
+**ETFInsight** is not just a portfolio tracker. It is a distributed, event-driven system designed to bridge the gap between **Quantitative Finance** and **Semantic AI**.
 
 Most portfolio trackers show you *how much* you have. ETFInsight tells you *why* your portfolio is moving, using a custom-built Financial Engine and a local LLM (Large Language Model) to answer questions like:
 
@@ -24,44 +26,48 @@ Most portfolio trackers show you *how much* you have. ETFInsight tells you *why*
 
 ## 🏗️ Architecture
 
-The solution follows **Clean Architecture** and **Domain-Driven Design (DDD)** principles.
+The solution follows **Clean Architecture**, **Domain-Driven Design (DDD)**, and operates within an isolated Docker network using an **API-Gateway / Reverse Proxy** pattern.
 
 ```mermaid
 graph TD
-    User[User / Client] --> API[.NET 9 Web API]
-
-    subgraph CoreDomain["Core Domain"]
-        API --> Engine["Performance Engine (TWRR)"]
-        API --> RAG["RAG & Chat Service"]
+    Client[Browser / User] -->|HTTP :3000| Nginx[Nginx Reverse Proxy]
+    
+    subgraph "Docker Network"
+        Nginx -->|/| Vue[Vue.js 3 SPA]
+        Nginx -->|/api/*| API[.NET 9 Web API]
+        
+        API --> Engine[Performance Engine TWRR]
+        API --> RAG[AI & RAG Service]
+        API --> Hangfire[Background Workers]
+        
+        Engine & Hangfire --> DB[(PostgreSQL + pgvector)]
+        RAG --> DB
+        RAG --> Ollama[Ollama Local LLM]
     end
-
-    subgraph DataVector["Data & Vector Layer"]
-        Engine --> DB[(PostgreSQL)]
-        RAG --> VectorDB[(pgvector)]
-    end
-
-    subgraph ExternalWorld["External World"]
-        Scraper["Python Ingestion"] --> DB
-        RAG --> Ollama["Ollama (Local LLM)"]
-    end
-```
+    
+    Scraper[Python Ingestion] -->|INSERT| DB
+    Scraper -->|Webhook Trigger| API
 
 ---
 
 ## 🧩 Key Components
+- Frontend SPA (Vue 3 + TypeScript)
+- Responsive, data-rich dashboard styled with Tailwind CSS and shadcn-vue. Served blazingly fast via Nginx.
 
-- **Core API (.NET 9)**  
-  Manages portfolios, transactions, and orchestrates the AI workflow.
+### Core API (.NET 9)
+- Manages portfolios, transactions, and orchestrates the AI workflow. Acts as the brain of the operation.
 
-- **Performance Engine**  
-  Implements **Time-Weighted Rate of Return (TWRR)** to calculate accurate performance regardless of cash flows (deposits/withdrawals).  
-  Provides analytics like **PnL**, **drawdowns**, **peaks**, and **annualized return**.
+### Performance Engine
+- Implements Time-Weighted Rate of Return (TWRR) to calculate accurate performance regardless of cash flows (deposits/withdrawals). Provides analytics like PnL, drawdowns, peaks, and annualized return.
 
-- **AI & Vector Search**  
-  Uses **pgvector** for semantic search on ETF descriptions and **Ollama (Llama 3)** for Retrieval Augmented Generation (**RAG**).
+### AI & Vector Search
+- Uses pgvector for semantic search on ETF descriptions and Ollama (Llama 3) for Retrieval Augmented Generation (RAG).
 
-- **Data Ingestion (Python)**  
-  Autonomous dockerized scraper to fetch **EOD (End-of-Day)** market data.
+### Data Quality & Event-Driven Workers
+- Utilizes Hangfire backed by PostgreSQL to run resilient, asynchronous background jobs (anomaly detection, flash-crash protection).
+
+### Data Ingestion (Python)
+- Autonomous dockerized scraper to fetch EOD (End-of-Day) market data.
 
 ---
 

@@ -1,4 +1,5 @@
 import sys
+import argparse
 import psycopg2
 import yfinance as yf
 import json
@@ -54,14 +55,23 @@ def get_active_etf_symbols() -> list:
     return [row[0] for row in rows]
 
 
-def fetch_etf_price(ticker: str) -> dict:
+def fetch_etf_price(
+    ticker: str, date_from: str | None = None, date_to: str | None = None
+) -> dict:
     """Fetch historical prices using yfinance library"""
     print(f"Fetching {ticker}...")
 
     return_value = yf.Ticker(ticker=ticker)
 
-    # Get last 5 days of data
-    hist = return_value.history(period=os.getenv("PERIOD", "5d"))
+    if date_from:
+        # Backfill mode — precise date range
+        print(f"  Range: {date_from} → {date_to or 'today'}")
+        hist = return_value.history(start=date_from, end=date_to)
+    else:
+        # Scheduled mode — relative period from env
+        period = os.getenv("PERIOD", "5d")
+        print(f"  Period: {period}")
+        hist = return_value.history(period=period)
 
     # Check if data was retrieved
     if hist is None or hist.empty:
@@ -124,20 +134,25 @@ def cleanup_old_files(directory: Path, days_old: int = 7):
         print(f"No old files to delete")
 
 
-def scrape_job(killer=None):
+def scrape_job(killer=None, date_from: str | None = None, date_to: str | None = None):
     """Main scraping job to run on schedule"""
     print(f"\n{'='*60}")
     print(f"Starting scrape job at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    if date_from:
+        print(f"Mode: BACKFILL  {date_from} → {date_to or 'today'}")
+    else:
+        print(f"Mode: SCHEDULED  period={os.getenv('PERIOD', '5d')}")
     print(f"{'='*60}")
 
     successful = 0
     failed = 0
 
     try:
-        # Cleanup old files in raw directory
-        raw_dir = Path("/app/data/raw")
-        cleanup_old_files(raw_dir, days_old=7)
-        print()
+        # Cleanup old files in raw directory (skip in backfill mode)
+        if not date_from:
+            raw_dir = Path("/app/data/raw")
+            cleanup_old_files(raw_dir, days_old=7)
+            print()
 
         symbols = get_active_etf_symbols()
         print(f"Found {len(symbols)} active ETF symbols: {', '.join(symbols)}\n")
@@ -150,7 +165,7 @@ def scrape_job(killer=None):
                 break
 
             try:
-                data = fetch_etf_price(symbol)
+                data = fetch_etf_price(symbol, date_from, date_to)
 
                 # Check if we got any data points
                 data_points = len(data.get("data", {}))
@@ -180,11 +195,44 @@ def scrape_job(killer=None):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="ETF price ingestion via yfinance")
+    parser.add_argument(
+        "--from",
+        dest="date_from",
+        type=str,
+        default=None,
+        help="Backfill start date YYYY-MM-DD (overrides BACKFILL_FROM env)",
+    )
+    parser.add_argument(
+        "--to",
+        dest="date_to",
+        type=str,
+        default=None,
+        help="Backfill end date YYYY-MM-DD (overrides BACKFILL_TO env)",
+    )
+    args = parser.parse_args()
 
+    # Resolve backfill dates: CLI args take priority over env vars
+    date_from = args.date_from or os.getenv("BACKFILL_FROM") or None
+    date_to = args.date_to or os.getenv("BACKFILL_TO") or None
+    # Normalise empty strings from env
+    date_from = date_from.strip() if date_from else None
+    date_to = date_to.strip() if date_to else None
+
+    if date_from:
+        # ── Backfill mode — run once and exit ─────────────────────────────────
+        print(f"ETF Price Scraper - Backfill Mode")
+        print(f"Range: {date_from} → {date_to or 'today'}")
+        print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        scrape_job(date_from=date_from, date_to=date_to)
+        return
+
+    # ── Scheduled mode — existing behaviour unchanged ──────────────────────────
     killer = GracefulKiller()
 
     print("ETF Price Scraper - Scheduled Mode")
     print(f"Schedule: Every {os.getenv('SCRAPER_INTERVAL_MINUTES', '2')} minutes")
+    print(f"Period:   {os.getenv('PERIOD', '5d')}")
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
     # Schedule the scraping job

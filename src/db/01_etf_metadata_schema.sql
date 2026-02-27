@@ -13,15 +13,29 @@ CREATE table etf_metadata(
 TABLESPACE pg_default;
 
 
-insert into etf_metadata
-	(ticker, isin, name, is_active, created_at, last_sync)
-values
-	('IS3N.DE', NULL, 'Core MSCI EM IMI USD (Acc)', True, NOW(), NULL),
-	('EUNA.DE', NULL, 'Global Aggregate Bond EUR (Acc)', True, NOW(), NULL),
-	('EUNL.DE', NULL, 'Core MSCI World USD(Acc)', True, NOW(), NULL),
-	('SWDA.MI', NULL, 'Global Found', True, NOW(), NULL),
-	('VWCE.DE', NULL, 'Global ETF equity EUR (Acc)', True, NOW(), NULL),
-	('QDVE.DE', NULL, 'USA Technological sector', True, NOW(), NULL),
-	('EIMI.MI', NULL, 'Emergent Markets', True, NOW(), NULL),
-	('VUSA.MI', NULL, 'S&P 500 index replica', True, NOW(), NULL),
-	('AGGH.MI', NULL, 'Diversified Global Bond ', True, NOW(), NULL)
+BEGIN;
+
+INSERT INTO etf_metadata
+    (ticker, isin, name, is_active, created_at, last_sync)
+VALUES
+
+-- ── ETFs ──────────────────────────────────────────────────────────────────────
+('SPY',  'US78462F1030', 'SPDR S&P 500 ETF Trust',                 TRUE, NOW(), NOW()),
+('QQQ',  'US46090E1038', 'Invesco QQQ Trust',                       TRUE, NOW(), NOW()),
+('VTI',  'US9229087690', 'Vanguard Total Stock Market ETF',         TRUE, NOW(), NOW()),
+('VGT',  'US9229087690', 'Vanguard Information Technology ETF',     TRUE, NOW(), NOW()),
+('BND',  'US9219378356', 'Vanguard Total Bond Market ETF',          TRUE, NOW(), NOW()),
+('GLD',  'US78463V1070', 'SPDR Gold Shares',                        TRUE, NOW(), NOW()),
+('SCHD', 'US8085247976', 'Schwab US Dividend Equity ETF',           TRUE, NOW(), NOW()),
+('AGG',  'US4642872422', 'iShares Core US Aggregate Bond ETF',      TRUE, NOW(), NOW()),
+
+-- ── Equities (used in Growth portfolio) ──────────────────────────────────────
+('MSFT', 'US5949181045', 'Microsoft Corporation',                   TRUE, NOW(), NOW()),
+('NVDA', 'US67066G1040', 'NVIDIA Corporation',                      TRUE, NOW(), NOW()),
+('AAPL', 'US0378331005', 'Apple Inc.',                              TRUE, NOW(), NOW()),
+('SMCI', 'US8621211007', 'Super Micro Computer Inc.',               TRUE, NOW(), NOW()),
+('TSLA', 'US88160R1014', 'Tesla Inc.',                              TRUE, NOW(), NOW())
+
+ON CONFLICT (ticker) DO NOTHING;
+
+COMMIT;

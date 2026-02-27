@@ -86,6 +86,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword123}
       - PERIOD=${PERIOD:-5d}
       - SCRAPER_INTERVAL_MINUTES=${SCRAPER_INTERVAL_MINUTES:-2}
+      - BACKFILL_FROM=${BACKFILL_FROM:-}
+      - BACKFILL_TO=${BACKFILL_TO:-}
     volumes:
       - etf_data:/app/data
     depends_on:

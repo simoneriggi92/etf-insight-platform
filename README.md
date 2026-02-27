@@ -71,6 +71,25 @@ graph TD
 - Autonomous dockerized scraper to fetch EOD (End-of-Day) market data.
 
 ---
+## Screenshots
+
+### Dashboard
+https://github.com/simoneriggi92/etf-insight-platform/blob/main/docs/images/1.png
+
+### Portfolio Management
+https://github.com/simoneriggi92/etf-insight-platform/blob/main/docs/images/2.png
+
+### Transaction List and performance tracker
+https://github.com/simoneriggi92/etf-insight-platform/blob/main/docs/images/3.png
+
+### AI Advisor
+https://github.com/simoneriggi92/etf-insight-platform/blob/main/docs/images/4.png
+
+### Data Quality Dashboard
+https://github.com/simoneriggi92/etf-insight-platform/blob/main/docs/images/5.png
+
+
+---
 
 ## 🗺️ Roadmap & Progress
 

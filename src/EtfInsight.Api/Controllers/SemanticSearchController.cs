@@ -33,25 +33,33 @@ namespace EtfInsight.Api.Controllers
             {
                 var etfDescriptions = new Dictionary<string, string>
                 {
-                    ["SWDA.MI"] = "Fondo globale che investe in aziende dei paesi sviluppati, molto diversificato. Replica l'indice MSCI World con esposizione a USA, Europa e Giappone.",
+                    // ── ETFs ──────────────────────────────────────────────────────────────
+                    ["SPY"] = "SPDR S&P 500 ETF Trust. Replica le 500 maggiori aziende USA per capitalizzazione. Il benchmark di riferimento del mercato azionario americano, altissima liquidità.",
 
-                    ["VWCE.DE"] = "ETF azionario globale che copre sia mercati sviluppati che emergenti. Include oltre 3000 aziende da tutto il mondo per massima diversificazione.",
+                    ["QQQ"] = "Invesco QQQ Trust. Replica il NASDAQ-100, i 100 titoli non-finanziari più capitalizzati del NASDAQ. Alta concentrazione in tech: Apple, Microsoft, NVIDIA, Amazon.",
 
-                    ["QDVE.DE"] = "Settore tecnologico USA, focus su software e hardware. Investe nelle principali aziende tech americane con alta crescita.",
+                    ["VTI"] = "Vanguard Total Stock Market ETF. Copre l'intero mercato azionario USA: large, mid e small cap. Massima diversificazione domestica con oltre 3500 aziende.",
 
-                    ["EIMI.MI"] = "Mercati emergenti, focus su Cina, India e Brasile. Alta volatilità ma potenziale di crescita elevato nei paesi in via di sviluppo.",
+                    ["VGT"] = "Vanguard Information Technology ETF. Settore tecnologico americano puro: software, hardware e semiconduttori. Alta crescita ma concentrato nel comparto IT.",
 
-                    ["EUNL.DE"] = "ETF azionario Europa, diversificato su tutti i settori. Include grandi aziende europee da vari paesi dell'Eurozona e UK.",
+                    ["BND"] = "Vanguard Total Bond Market ETF. Obbligazionario USA investment grade diversificato: Treasury, corporate e mortgage-backed securities. Stabilità e reddito fisso.",
 
-                    ["IS3N.DE"] = "Obbligazionario corporate investment grade EUR. Basso rischio, fornisce reddito stabile attraverso bond di aziende europee solide.",
+                    ["GLD"] = "SPDR Gold Shares. Replica il prezzo dell'oro fisico. Bene rifugio per eccellenza, ideale per proteggere il portafoglio dall'inflazione e dalla volatilità di mercato.",
 
-                    ["EUNA.DE"] = "Obbligazionario governativo europeo. Molto sicuro, investe in titoli di stato dell'Eurozona con rating elevato.",
+                    ["SCHD"] = "Schwab US Dividend Equity ETF. Investe in aziende USA con solida storia di dividendi e fondamentali robusti. Ottimo per chi cerca reddito passivo e qualità.",
 
-                    ["CSPX.MI"] = "S&P 500, le 500 maggiori aziende USA. Esposizione concentrata al mercato azionario americano, alta qualità.",
+                    ["AGG"] = "iShares Core US Aggregate Bond ETF. Obbligazionario USA aggregato: government, corporate e securitized. Alternativa diversificata a BND per il reddito fisso americano.",
 
-                    ["VUSA.MI"] = "Replica l'indice S&P 500 con basse commissioni. Alternativa a CSPX per investire nelle grandi aziende americane.",
+                    // ── Equities ──────────────────────────────────────────────────────────
+                    ["MSFT"] = "Microsoft Corporation. Colosso del software e cloud computing (Azure). Tra le aziende più capitalizzate al mondo, con ricavi ricorrenti e forte posizione nell'AI enterprise.",
 
-                    ["AGGH.MI"] = "Obbligazionario globale diversificato investment grade. Mix di bond governativi e corporate da tutto il mondo per stabilità."
+                    ["NVDA"] = "NVIDIA Corporation. Leader nei chip grafici (GPU) e nell'intelligenza artificiale. L'azienda più rilevante dell'era AI: i suoi processori alimentano i principali modelli LLM.",
+
+                    ["AAPL"] = "Apple Inc. La più grande azienda al mondo per capitalizzazione. Ecosistema chiuso (iPhone, Mac, Services) con margini elevatissimi e base clienti fidelizzata.",
+
+                    ["SMCI"] = "Super Micro Computer Inc. Produttore di server ad alte prestazioni e infrastrutture AI. Beneficia direttamente della domanda di data center per l'addestramento di modelli AI.",
+
+                    ["TSLA"] = "Tesla Inc. Pioneer dei veicoli elettrici e dell'energia rinnovabile. Alta volatilità, ma posizionata su automazione, robotica e storage energetico oltre all'EV."
                 };
 
                 var savedCount = 0;

@@ -15,6 +15,7 @@ x-airflow-common: &airflow-common
     ETF_DB_PASSWORD: ${POSTGRES_PASSWORD}
     # .NET API webhook — mirrors DATA_QUALITY_WEBHOOK_URL in load_to_db.py
     DATA_QUALITY_WEBHOOK_URL: http://etf-api:8080/api/data-quality/scan
+    AIRFLOW__CORE__TEST_CONNECTION: "Enabled"
   volumes:
     - ../airflow/dags:/opt/airflow/dags
     - ../airflow/plugins:/opt/airflow/plugins
@@ -209,6 +210,15 @@ services:
     command: webserver
     ports:
       - "8090:8080"
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    networks:
+      - etf-network
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s
@@ -220,6 +230,15 @@ services:
     <<: *airflow-common
     container_name: etf-airflow-scheduler
     command: scheduler
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    networks:
+      - etf-network
     restart: unless-stopped
 
 networks:

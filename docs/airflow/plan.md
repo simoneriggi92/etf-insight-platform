@@ -897,7 +897,7 @@ def test_backfill_dag_has_params():
 
 **Goal:** Get Airflow running locally inside the existing Docker stack.
 
-- [ ] **1.1** Generate a Fernet key for Airflow encryption:
+- [x] **1.1** Generate a Fernet key for Airflow encryption:
 
   ```bash
   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -905,23 +905,23 @@ def test_backfill_dag_has_params():
 
   Store result as `AIRFLOW_FERNET_KEY` in `infra/.env`.
 
-- [ ] **1.2** Generate a webserver secret key and store as `AIRFLOW_SECRET_KEY` in `infra/.env`.
+- [x] **1.2** Generate a webserver secret key and store as `AIRFLOW_SECRET_KEY` in `infra/.env`.
 
-- [ ] **1.3** Add the `x-airflow-common` YAML anchor to `infra/docker-compose.yml` with all environment variables (executor, DB conn, ETF DB vars, webhook URL).
+- [x] **1.3** Add the `x-airflow-common` YAML anchor to `infra/docker-compose.yml` with all environment variables (executor, DB conn, ETF DB vars, webhook URL).
 
-- [ ] **1.4** Add `postgres-airflow` service to `docker-compose.yml` (Postgres 16, dedicated volume, healthcheck).
+- [x] **1.4** Add `postgres-airflow` service to `docker-compose.yml` (Postgres 16, dedicated volume, healthcheck).
 
-- [ ] **1.5** Add `airflow-init` service to `docker-compose.yml` (runs `airflow db migrate` + creates admin user, `restart: "no"`).
+- [x] **1.5** Add `airflow-init` service to `docker-compose.yml` (runs `airflow db migrate` + creates admin user, `restart: "no"`).
 
-- [ ] **1.6** Add `airflow-webserver` service (port `8090:8080`, healthcheck via `/health`).
+- [x] **1.6** Add `airflow-webserver` service (port `8090:8080`, healthcheck via `/health`).
 
-- [ ] **1.7** Add `airflow-scheduler` service.
+- [x] **1.7** Add `airflow-scheduler` service.
 
-- [ ] **1.8** Add `postgres_airflow_data` and `airflow_logs` to the `volumes:` block in `docker-compose.yml`.
+- [x] **1.8** Add `postgres_airflow_data` and `airflow_logs` to the `volumes:` block in `docker-compose.yml`.
 
-- [ ] **1.9** Mount `../airflow/dags`, `../airflow/plugins`, `../airflow/include` as volumes on all Airflow services.
+- [x] **1.9** Mount `../airflow/dags`, `../airflow/plugins`, `../airflow/include` as volumes on all Airflow services.
 
-- [ ] **1.10** Create the `airflow/` root folder with the following empty structure:
+- [x] **1.10** Create the `airflow/` root folder with the following empty structure:
 
   ```
   airflow/
@@ -931,13 +931,13 @@ def test_backfill_dag_has_params():
   └── tests/
   ```
 
-- [ ] **1.11** Create `airflow/requirements.txt` with pinned versions (airflow 2.9.2, providers-postgres, providers-http, yfinance, psycopg2-binary, requests, pandas).
+- [x] **1.11** Create `airflow/requirements.txt` with pinned versions (airflow 2.9.2, providers-postgres, providers-http, yfinance, psycopg2-binary, requests, pandas).
 
-- [ ] **1.12** Run `docker compose up airflow-init` and confirm it exits cleanly (code 0).
+- [x] **1.12** Run `docker compose up airflow-init` and confirm it exits cleanly (code 0).
 
-- [ ] **1.13** Run `docker compose up airflow-webserver airflow-scheduler` and verify the UI is reachable at `http://localhost:8090`.
+- [x] **1.13** Run `docker compose up airflow-webserver airflow-scheduler` and verify the UI is reachable at `http://localhost:8090`.
 
-- [ ] **1.14** Confirm the Airflow metadata DB (`postgres-airflow`) is isolated from the ETF DB (`postgres`) — query both to verify schema separation.
+- [x] **1.14** Confirm the Airflow metadata DB (`postgres-airflow`) is isolated from the ETF DB (`postgres`) — query both to verify schema separation.
 
 ---
 
@@ -945,26 +945,26 @@ def test_backfill_dag_has_params():
 
 **Goal:** Wire Airflow to the ETF database and API using its secrets management.
 
-- [ ] **2.1** Open the Airflow UI at `http://localhost:8090` → Admin → Connections.
+- [x] **2.1** Open the Airflow UI at `http://localhost:8090` → Admin → Connections.
 
-- [ ] **2.2** Create connection `etf_postgres`:
+- [x] **2.2** Create connection `etf_postgres`:
   - Type: `Postgres`
   - Host: `postgres`, Port: `5432`
   - Schema: value of `POSTGRES_DB`
   - Login / Password: values of `POSTGRES_USER` / `POSTGRES_PASSWORD`
 
-- [ ] **2.3** Create connection `etf_api`:
+- [x] **2.3** Create connection `etf_api`:
   - Type: `HTTP`
   - Host: `http://etf-api`, Port: `8080`
 
-- [ ] **2.4** Open Admin → Variables and set:
+- [x] **2.4** Open Admin → Variables and set:
   - `etf_scraper_period` → `5d`
   - `etf_static_symbols` → `SPY,QQQ,VTI,EUNL.DE,EUNA.DE,IS3N.DE` _(adjust to match `etf_metadata.is_active`)_
   - `data_quality_webhook_url` → `http://etf-api:8080/api/data-quality/scan`
 
-- [ ] **2.5** Alternatively, script all of the above via CLI (document the commands in a `airflow/setup_connections.sh` file for repeatability).
+- [x] **2.5** Alternatively, script all of the above via CLI (document the commands in a `airflow/setup_connections.sh` file for repeatability).
 
-- [ ] **2.6** Verify connection `etf_postgres` by running a test query from the Airflow UI (Admin → Connections → Test).
+- [x] **2.6** Verify connection `etf_postgres` by running a test query from the Airflow UI (Admin → Connections → Test).
 
 ---
 

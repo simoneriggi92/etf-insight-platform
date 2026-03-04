@@ -16,11 +16,13 @@ x-airflow-common: &airflow-common
     # .NET API webhook — mirrors DATA_QUALITY_WEBHOOK_URL in load_to_db.py
     DATA_QUALITY_WEBHOOK_URL: http://etf-api:8080/api/data-quality/scan
     AIRFLOW__CORE__TEST_CONNECTION: "Enabled"
+    _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==0.2.40 pandas==2.2.2 pytest==8.2.0"
   volumes:
     - ../airflow/dags:/opt/airflow/dags
     - ../airflow/plugins:/opt/airflow/plugins
     - ../airflow/include:/opt/airflow/include
     - airflow_logs:/opt/airflow/logs
+    - ../airflow/tests:/opt/airflow/tests
   depends_on:
     postgres-airflow:
       condition: service_healthy

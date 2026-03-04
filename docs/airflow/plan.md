@@ -974,10 +974,10 @@ def test_backfill_dag_has_params():
 
 #### Hook
 
-- [ ] **3.1** Create `airflow/plugins/hooks/etf_db_hook.py` extending `PostgresHook`.
-- [ ] **3.2** Implement `get_active_symbols()` — mirrors `get_active_etf_symbols()` in `ingest_prices_yfinance.py`.
-- [ ] **3.3** Implement `upsert_prices(records)` — mirrors `insert_prices()` in `load_to_db.py` using `ON CONFLICT (symbol, price_date) DO UPDATE`.
-- [ ] **3.4** Manually smoke-test the hook from a Python REPL inside the Airflow container:
+- [x] **3.1** Create `airflow/plugins/hooks/etf_db_hook.py` extending `PostgresHook`.
+- [x] **3.2** Implement `get_active_symbols()` — mirrors `get_active_etf_symbols()` in `ingest_prices_yfinance.py`.
+- [x] **3.3** Implement `upsert_prices(records)` — mirrors `insert_prices()` in `load_to_db.py` using `ON CONFLICT (symbol, price_date) DO UPDATE`.
+- [x] **3.4** Manually smoke-test the hook from a Python REPL inside the Airflow container:
   ```bash
   docker exec -it <airflow-scheduler> python -c "
   from plugins.hooks.etf_db_hook import ETFDatabaseHook
@@ -987,13 +987,13 @@ def test_backfill_dag_has_params():
 
 #### Transform — Prices
 
-- [ ] **3.5** Create `airflow/include/transforms/prices.py`.
-- [ ] **3.6** Implement `fetch_raw_prices(symbol, period)` — wraps `yf.Ticker.history()` for scheduled mode.
-- [ ] **3.7** Implement `fetch_raw_prices_range(symbol, start, end)` — wraps `yf.Ticker.history()` for backfill mode.
-- [ ] **3.8** Implement `normalize_prices(raw, symbol)` — replaces `parse_price_file()` in `load_to_db.py`: cast types, rename columns, attach symbol.
-- [ ] **3.9** Implement `validate_prices(records)` — drop records where `close <= 0`, `high < low`, or `price_date` is empty.
-- [ ] **3.10** Create `airflow/tests/test_transforms.py` with `TestNormalizePrices` and `TestValidatePrices` test classes.
-- [ ] **3.11** Run tests locally: `pytest airflow/tests/test_transforms.py -v` — all must pass.
+- [x] **3.5** Create `airflow/include/transforms/prices.py`.
+- [x] **3.6** Implement `fetch_raw_prices(symbol, period)` — wraps `yf.Ticker.history()` for scheduled mode.
+- [x] **3.7** Implement `fetch_raw_prices_range(symbol, start, end)` — wraps `yf.Ticker.history()` for backfill mode.
+- [x] **3.8** Implement `normalize_prices(raw, symbol)` — replaces `parse_price_file()` in `load_to_db.py`: cast types, rename columns, attach symbol.
+- [x] **3.9** Implement `validate_prices(records)` — drop records where `close <= 0`, `high < low`, or `price_date` is empty.
+- [x] **3.10** Create `airflow/tests/test_transforms.py` with `TestNormalizePrices` and `TestValidatePrices` test classes.
+- [x] **3.11** Run tests locally: `pytest airflow/tests/test_transforms.py -v` — all must pass.
 
 ---
 

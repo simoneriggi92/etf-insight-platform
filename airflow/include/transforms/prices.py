@@ -12,7 +12,7 @@ def fetch_raw_prices(symbol: str, period: str = "5d") -> list[dict]:
     if df.empty:
         return []
     df.index = pd.to_datetime(df.index).date
-    df.reset_index(inplace=True)
+    df = df.reset_index().rename(columns={"index": "Date"})
     return df.to_dict(orient="records")
 
 
@@ -25,7 +25,7 @@ def fetch_raw_prices_range(symbol: str, start: str, end: str) -> list[dict]:
     if df.empty:
         return []
     df.index = pd.to_datetime(df.index).date
-    df.reset_index(inplace=True)
+    df = df.reset_index().rename(columns={"index": "Date"})
     return df.to_dict(orient="records")
 
 
@@ -43,12 +43,12 @@ def normalize_prices(raw: list[dict], symbol: str) -> list[dict]:
         try:
             result.append(
                 {
-                    "symbol": symbol,
+                    "ticker": symbol,
                     "price_date": str(price_date),
-                    "open": float(row.get("Open", 0)),
-                    "high": float(row.get("High", 0)),
-                    "low": float(row.get("Low", 0)),
-                    "close": float(row.get("Close", 0)),
+                    "open_price": float(row.get("Open", 0)),
+                    "high_price": float(row.get("High", 0)),
+                    "low_price": float(row.get("Low", 0)),
+                    "close_price": float(row.get("Close", 0)),
                     "volume": int(row.get("Volume", 0)),
                 }
             )
@@ -64,7 +64,11 @@ def validate_prices(records: list[dict]) -> list[dict]:
     """
     valid, dropped = [], 0
     for r in records:
-        if r["close"] <= 0 or r["high"] < r["low"] or not r["price_date"]:
+        if (
+            r["close_price"] <= 0
+            or r["high_price"] < r["low_price"]
+            or not r["price_date"]
+        ):
             dropped += 1
             continue
         valid.append(r)

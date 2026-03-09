@@ -22,8 +22,8 @@ class TestNormalizePrices:
         ]
         result = normalize_prices(raw, "SPY")
         assert len(result) == 1
-        assert result[0]["symbol"] == "SPY"
-        assert result[0]["close"] == 103.0
+        assert result[0]["ticker"] == "SPY"
+        assert result[0]["close_price"] == 103.0
         assert result[0]["price_date"] == "2025-01-10"
         assert result[0]["volume"] == 1000
 
@@ -42,7 +42,15 @@ class TestNormalizePrices:
         r = result[0]
         assert all(
             k in r
-            for k in ["symbol", "price_date", "open", "high", "low", "close", "volume"]
+            for k in [
+                "ticker",
+                "price_date",
+                "open_price",
+                "high_price",
+                "low_price",
+                "close_price",
+                "volume",
+            ]
         )
 
     def test_skips_malformed_close(self):
@@ -88,12 +96,12 @@ class TestNormalizePrices:
 class TestValidatePrices:
     def _make(self, **overrides) -> list[dict]:
         base = {
-            "symbol": "SPY",
+            "ticker": "SPY",
             "price_date": "2025-01-10",
-            "open": 100.0,
-            "high": 105.0,
-            "low": 99.0,
-            "close": 103.0,
+            "open_price": 100.0,
+            "high_price": 105.0,
+            "low_price": 99.0,
+            "close_price": 103.0,
             "volume": 1000,
         }
         return [{**base, **overrides}]
@@ -102,13 +110,13 @@ class TestValidatePrices:
         assert len(validate_prices(self._make())) == 1
 
     def test_drops_zero_close(self):
-        assert validate_prices(self._make(close=0)) == []
+        assert validate_prices(self._make(close_price=0)) == []
 
     def test_drops_negative_close(self):
-        assert validate_prices(self._make(close=-5.0)) == []
+        assert validate_prices(self._make(close_price=-5.0)) == []
 
     def test_drops_inverted_high_low(self):
-        assert validate_prices(self._make(high=90.0, low=105.0)) == []
+        assert validate_prices(self._make(high_price=90.0, low_price=105.0)) == []
 
     def test_drops_empty_price_date(self):
         assert validate_prices(self._make(price_date="")) == []
@@ -117,10 +125,10 @@ class TestValidatePrices:
         assert validate_prices(self._make(price_date=None)) == []
 
     def test_valid_batch_filters_one_bad(self):
-        records = self._make() + self._make(close=-1.0)
+        records = self._make() + self._make(close_price=-1.0)
         result = validate_prices(records)
         assert len(result) == 1
-        assert result[0]["close"] == 103.0
+        assert result[0]["close_price"] == 103.0
 
     def test_empty_input_returns_empty(self):
         assert validate_prices([]) == []

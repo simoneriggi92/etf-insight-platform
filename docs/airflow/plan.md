@@ -1001,19 +1001,19 @@ def test_backfill_dag_has_params():
 
 **Goal:** Implement and validate the core daily ETL DAG that replaces the `scraper` + `ingestor` Docker services.
 
-- [ ] **4.1** Create `airflow/dags/etf_daily_prices.py`.
-- [ ] **4.2** Define `DEFAULT_ARGS` with `retries=3`, `retry_delay=5min`, `retry_exponential_backoff=True`.
-- [ ] **4.3** Implement `_get_active_symbols()` task — queries `etf_metadata` via `ETFDatabaseHook`, pushes list to XCom.
-- [ ] **4.4** Implement `_fetch_prices_for_symbol(symbol)` task — reads `etf_scraper_period` Variable, calls `fetch_raw_prices()`, pushes raw data to XCom.
-- [ ] **4.5** Create a `TaskGroup("fetch_prices")` with one `PythonOperator` per symbol, generated from `etf_static_symbols` Variable.
-- [ ] **4.6** Implement `_normalize_and_validate()` task — pulls raw XCom from each fetch task, calls `normalize_prices()` + `validate_prices()`, pushes clean records to XCom.
-- [ ] **4.7** Implement `_load_prices()` task — pulls clean records from XCom, calls `ETFDatabaseHook().upsert_prices()`, logs affected row count.
-- [ ] **4.8** Add `TriggerDagRunOperator` as final task pointing to `data_quality_scan` DAG (`wait_for_completion=False`).
-- [ ] **4.9** Wire the dependency chain: `get_active_symbols >> fetch_group >> normalize_and_validate >> load_prices >> trigger_dq_scan`.
-- [ ] **4.10** Set `schedule="0 22 * * 1-5"`, `catchup=False`, `max_active_runs=1`.
-- [ ] **4.11** Verify the DAG appears in the Airflow UI with no import errors.
-- [ ] **4.12** Trigger the DAG manually from the UI and confirm all tasks go green.
-- [ ] **4.13** Query `etf_prices` to verify rows were inserted/updated with correct `symbol`, `price_date`, and OHLCV values.
+- [x] **4.1** Create `airflow/dags/etf_daily_prices.py`.
+- [x] **4.2** Define `DEFAULT_ARGS` with `retries=3`, `retry_delay=5min`, `retry_exponential_backoff=True`.
+- [x] **4.3** Implement `_get_active_symbols()` task — queries `etf_metadata` via `ETFDatabaseHook`, pushes list to XCom.
+- [x] **4.4** Implement `_fetch_prices_for_symbol(symbol)` task — reads `etf_scraper_period` Variable, calls `fetch_raw_prices()`, pushes raw data to XCom.
+- [x] **4.5** Create a `TaskGroup("fetch_prices")` with one `PythonOperator` per symbol, generated from `etf_static_symbols` Variable.
+- [x] **4.6** Implement `_normalize_and_validate()` task — pulls raw XCom from each fetch task, calls `normalize_prices()` + `validate_prices()`, pushes clean records to XCom.
+- [x] **4.7** Implement `_load_prices()` task — pulls clean records from XCom, calls `ETFDatabaseHook().upsert_prices()`, logs affected row count.
+- [x] **4.8** Add `TriggerDagRunOperator` as final task pointing to `data_quality_scan` DAG (`wait_for_completion=False`).
+- [x] **4.9** Wire the dependency chain: `get_active_symbols >> fetch_group >> normalize_and_validate >> load_prices >> trigger_dq_scan`.
+- [x] **4.10** Set `schedule="0 22 * * 1-5"`, `catchup=False`, `max_active_runs=1`.
+- [x]**4.11** Verify the DAG appears in the Airflow UI with no import errors.
+- [x] **4.12** Trigger the DAG manually from the UI and confirm all tasks go green.
+- [x] **4.13** Query `etf_prices` to verify rows were inserted/updated with correct `symbol`, `price_date`, and OHLCV values.
 
 ---
 
@@ -1021,20 +1021,20 @@ def test_backfill_dag_has_params():
 
 **Goal:** Replace the manual `--from`/`--to` CLI invocation of `ingest_prices_yfinance.py` with a UI-triggerable parameterized DAG.
 
-- [ ] **5.1** Create `airflow/dags/etf_backfill_prices.py`.
-- [ ] **5.2** Declare `Param("date_from")` and `Param("date_to")` on the DAG with string type and example defaults.
-- [ ] **5.3** Implement `_validate_params()` task — raise `ValueError` if either param is missing or `date_from >= date_to`.
-- [ ] **5.4** Implement `_get_active_symbols()` task (same as daily DAG — push to XCom).
-- [ ] **5.5** Implement `_fetch_range(symbol)` task — reads `date_from`/`date_to` from `ctx["params"]`, calls `fetch_raw_prices_range()`, pushes to XCom.
-- [ ] **5.6** Create a `TaskGroup("fetch_prices_range")` with one task per symbol (same symbol list as daily DAG).
-- [ ] **5.7** Implement `_normalize_and_validate()` and `_load_prices()` tasks (reuse same logic as daily DAG).
-- [ ] **5.8** Add `TriggerDagRunOperator` pointing to `data_quality_scan` with `wait_for_completion=True`.
-- [ ] **5.9** Wire chain: `validate_params >> get_active_symbols >> fetch_group >> normalize_and_validate >> load_prices >> trigger_dq_scan`.
-- [ ] **5.10** Set `schedule=None` (manual trigger only), `max_active_runs=1`.
-- [ ] **5.11** Verify DAG appears in the UI with no import errors.
-- [ ] **5.12** Trigger the DAG from the UI with `date_from="2024-01-01"` and `date_to="2024-12-31"`, confirm all tasks green.
-- [ ] **5.13** Verify `etf_prices` contains the expected date range for each symbol.
-- [ ] **5.14** Test the validation task: trigger with invalid params (`date_from > date_to`) and confirm `validate_params` fails fast with a clear error.
+- [x] **5.1** Create `airflow/dags/etf_backfill_prices.py`.
+- [x] **5.2** Declare `Param("date_from")` and `Param("date_to")` on the DAG with string type and example defaults.
+- [x] **5.3** Implement `_validate_params()` task — raise `ValueError` if either param is missing or `date_from >= date_to`.
+- [x] **5.4** Implement `_get_active_symbols()` task (same as daily DAG — push to XCom).
+- [x] **5.5** Implement `_fetch_range(symbol)` task — reads `date_from`/`date_to` from `ctx["params"]`, calls `fetch_raw_prices_range()`, pushes to XCom.
+- [x] **5.6** Create a `TaskGroup("fetch_prices_range")` with one task per symbol (same symbol list as daily DAG).
+- [x] **5.7** Implement `_normalize_and_validate()` and `_load_prices()` tasks (reuse same logic as daily DAG).
+- [x] **5.8** Add `TriggerDagRunOperator` pointing to `data_quality_scan` with `wait_for_completion=True`.
+- [x] **5.9** Wire chain: `validate_params >> get_active_symbols >> fetch_group >> normalize_and_validate >> load_prices >> trigger_dq_scan`.
+- [x] **5.10** Set `schedule=None` (manual trigger only), `max_active_runs=1`.
+- [x] **5.11** Verify DAG appears in the UI with no import errors.
+- [x] **5.12** Trigger the DAG from the UI with `date_from="2024-01-01"` and `date_to="2024-12-31"`, confirm all tasks green.
+- [x] **5.13** Verify `etf_prices` contains the expected date range for each symbol.
+- [x] **5.14** Test the validation task: trigger with invalid params (`date_from > date_to`) and confirm `validate_params` fails fast with a clear error.
 
 ---
 
@@ -1042,12 +1042,12 @@ def test_backfill_dag_has_params():
 
 **Goal:** Replace the `trigger_data_quality_scan()` webhook call in `load_to_db.py` with a stand-alone triggerable DAG.
 
-- [ ] **6.1** Create `airflow/dags/data_quality_scan.py`.
-- [ ] **6.2** Implement `_trigger_dq_scan()` task — reads `data_quality_webhook_url` Variable, reads `source_dag` from `dag_run.conf`, implements 3-attempt retry loop with 5s delay (mirrors existing logic in `load_to_db.py`).
-- [ ] **6.3** Set `schedule=None`, `max_active_runs=3` (allow concurrent scans from daily + backfill DAGs).
-- [ ] **6.4** Verify the DAG appears in the UI with no import errors.
-- [ ] **6.5** Trigger the DAG manually with `{"source_dag": "manual_test"}` and confirm the `.NET` API receives the POST and responds with a valid DQ stats payload.
-- [ ] **6.6** Confirm that when `etf_daily_prices` completes, `data_quality_scan` is automatically triggered and appears in the DAG run list.
+- [x] **6.1** Create `airflow/dags/data_quality_scan.py`.
+- [x] **6.2** Implement `_trigger_dq_scan()` task — reads `data_quality_webhook_url` Variable, reads `source_dag` from `dag_run.conf`, implements 3-attempt retry loop with 5s delay (mirrors existing logic in `load_to_db.py`).
+- [x] **6.3** Set `schedule=None`, `max_active_runs=3` (allow concurrent scans from daily + backfill DAGs).
+- [x] **6.4** Verify the DAG appears in the UI with no import errors.
+- [x] **6.5** Trigger the DAG manually with `{"source_dag": "manual_test"}` and confirm the `.NET` API receives the POST and responds with a valid DQ stats payload.
+- [x] **6.6** Confirm that when `etf_daily_prices` completes, `data_quality_scan` is automatically triggered and appears in the DAG run list.
 
 ---
 
@@ -1055,12 +1055,12 @@ def test_backfill_dag_has_params():
 
 **Goal:** Ensure all DAGs parse cleanly and have the expected structure, caught by CI before deployment.
 
-- [ ] **7.1** Create `airflow/tests/test_dag_integrity.py`.
-- [ ] **7.2** Implement `test_no_import_errors()` — asserts `DagBag.import_errors == {}`.
-- [ ] **7.3** Implement `test_expected_dags_present()` — asserts `etf_daily_prices`, `etf_backfill_prices`, `data_quality_scan` are all loaded.
-- [ ] **7.4** Implement `test_etf_daily_prices_has_trigger()` — asserts `trigger_dq_scan` and `load_prices` task IDs exist.
-- [ ] **7.5** Implement `test_backfill_dag_has_params()` — asserts `date_from` and `date_to` in `dag.params`.
-- [ ] **7.6** Run `pytest airflow/tests/ -v` — all tests must pass.
+- [x] **7.1** Create `airflow/tests/test_dag_integrity.py`.
+- [x] **7.2** Implement `test_no_import_errors()` — asserts `DagBag.import_errors == {}`.
+- [x] **7.3** Implement `test_expected_dags_present()` — asserts `etf_daily_prices`, `etf_backfill_prices`, `data_quality_scan` are all loaded.
+- [x] **7.4** Implement `test_etf_daily_prices_has_trigger()` — asserts `trigger_dq_scan` and `load_prices` task IDs exist.
+- [x] **7.5** Implement `test_backfill_dag_has_params()` — asserts `date_from` and `date_to` in `dag.params`.
+- [x] **7.6** Run `pytest airflow/tests/ -v` — all tests must pass.
 
 ---
 
@@ -1068,13 +1068,13 @@ def test_backfill_dag_has_params():
 
 **Goal:** Run both the old Docker services and the new Airflow DAGs simultaneously to validate correctness before cutover. Safe because all DB writes are idempotent (`ON CONFLICT DO UPDATE`).
 
-- [ ] **8.1** Confirm both `scraper` and `ingestor` Docker services are still running.
-- [ ] **8.2** Enable `etf_daily_prices` DAG in the Airflow UI (toggle ON).
-- [ ] **8.3** At the end of day 1: compare `etf_prices` row counts and spot-check OHLCV values against the raw JSON files written by the old scraper.
-- [ ] **8.4** Monitor Airflow task logs for any errors or unexpected retries for 3 consecutive trading days.
-- [ ] **8.5** Verify `data_quality_scan` DAG is triggered automatically after each successful `etf_daily_prices` run.
-- [ ] **8.6** Confirm DQ anomaly counts in `data_anomalies` are consistent with what the old webhook-triggered Hangfire scan was producing.
-- [ ] **8.7** Document any discrepancies found and fix before cutover.
+- [x] **8.1** Confirm both `scraper` and `ingestor` Docker services are still running.
+- [x] **8.2** Enable `etf_daily_prices` DAG in the Airflow UI (toggle ON).
+- [x] **8.3** At the end of day 1: compare `etf_prices` row counts and spot-check OHLCV values against the raw JSON files written by the old scraper.
+- [x] **8.4** Monitor Airflow task logs for any errors or unexpected retries for 3 consecutive trading days.
+- [x] **8.5** Verify `data_quality_scan` DAG is triggered automatically after each successful `etf_daily_prices` run.
+- [x] **8.6** Confirm DQ anomaly counts in `data_anomalies` are consistent with what the old webhook-triggered Hangfire scan was producing.
+- [x] **8.7** Document any discrepancies found and fix before cutover.
 
 ---
 
@@ -1082,18 +1082,18 @@ def test_backfill_dag_has_params():
 
 **Goal:** Decommission the old ingestion services and make Airflow the sole ingestor.
 
-- [ ] **9.1** Comment out (do not yet delete) the `scraper` and `ingestor` service definitions in `docker-compose.yml`.
-- [ ] **9.2** Comment out the `etf_data` shared volume.
-- [ ] **9.3** Run `docker compose up -d` to apply changes — confirm scraper and ingestor containers are stopped.
-- [ ] **9.4** Monitor `etf_daily_prices` DAG for 2 more trading days with no old services running.
-- [ ] **9.5** Confirm `etf_prices` continues to receive fresh data exclusively from Airflow DAG runs.
-- [ ] **9.6** Once stable, permanently remove the `scraper` service, `ingestor` service, and `etf_data` volume from `docker-compose.yml`.
-- [ ] **9.7** Delete `src/ingestion/ingest_prices_yfinance.py`.
-- [ ] **9.8** Delete `src/ingestion/load_to_db.py`.
-- [ ] **9.9** Delete `src/ingestion/graceful_killer.py`.
-- [ ] **9.10** Delete `src/ingestion/Dockerfile` (both scraper and ingestor targets are gone).
-- [ ] **9.11** Update `src/ingestion/requirements.txt` or remove it entirely if the folder is now empty.
-- [ ] **9.12** Run a final `docker compose up -d` to confirm the stack starts cleanly with no references to removed services.
+- [x] **9.1** Comment out (do not yet delete) the `scraper` and `ingestor` service definitions in `docker-compose.yml`.
+- [x] **9.2** Comment out the `etf_data` shared volume.
+- [x] **9.3** Run `docker compose up -d` to apply changes — confirm scraper and ingestor containers are stopped.
+- [x] **9.4** Monitor `etf_daily_prices` DAG for 2 more trading days with no old services running.
+- [x] **9.5** Confirm `etf_prices` continues to receive fresh data exclusively from Airflow DAG runs.
+- [x] **9.6** Once stable, permanently remove the `scraper` service, `ingestor` service, and `etf_data` volume from `docker-compose.yml`.
+- [x] **9.7** Delete `src/ingestion/ingest_prices_yfinance.py`.
+- [x] **9.8** Delete `src/ingestion/load_to_db.py`.
+- [x] **9.9** Delete `src/ingestion/graceful_killer.py`.
+- [x] **9.10** Delete `src/ingestion/Dockerfile` (both scraper and ingestor targets are gone).
+- [x] **9.11** Removed `src/ingestion/` directory entirely (requirements.txt and test_yfinance.py also deleted).
+- [x] **9.12** Run a final `docker compose up -d` — stack starts cleanly, 8 containers, no orphan warnings.
 
 ---
 
@@ -1101,16 +1101,16 @@ def test_backfill_dag_has_params():
 
 **Goal:** Use the new `etf_backfill_prices` DAG to populate any historical gaps left by the old scripts.
 
-- [ ] **10.1** Query `etf_prices` to identify the earliest and latest dates per symbol:
+- [x] **10.1** Query `etf_prices` to identify the earliest and latest dates per symbol:
   ```sql
   SELECT symbol, MIN(price_date), MAX(price_date), COUNT(*)
   FROM etf_prices
   GROUP BY symbol
   ORDER BY symbol;
   ```
-- [ ] **10.2** For each symbol with gaps, trigger `etf_backfill_prices` from the UI with the appropriate `date_from` / `date_to` range.
-- [ ] **10.3** After each backfill run, re-run the query above to confirm the gap is filled.
-- [ ] **10.4** Trigger `data_quality_scan` manually after all backfills are complete and review `data_anomalies` for any newly detected issues.
+- [x] **10.2** For each symbol with gaps, trigger `etf_backfill_prices` from the UI with the appropriate `date_from` / `date_to` range.
+- [x] **10.3** After each backfill run, re-run the query above to confirm the gap is filled.
+- [x] **10.4** Trigger `data_quality_scan` manually after all backfills are complete and review `data_anomalies` for any newly detected issues.
 
 ---
 

@@ -9,7 +9,7 @@ class ETFDatabaseHook(PostgresHook):
     src/ingestion/ingest_prices_yfinance.py.
     """
 
-    conn_name_attr = "etf_postgres_conn_id"
+    conn_name_attr = "etf_postgres"
     default_conn_name = "etf_postgres"
 
     def get_active_symbols(self) -> list[str]:
@@ -33,12 +33,12 @@ class ETFDatabaseHook(PostgresHook):
 
         sql = """
             INSERT INTO etf_prices
-                (symbol, price_date, open_price, high_price, low_price,
+                (ticker, price_date, open_price, high_price, low_price,
                  close_price, volume)
             VALUES
-                (%(symbol)s, %(price_date)s, %(open)s, %(high)s, %(low)s,
-                 %(close)s, %(volume)s)
-            ON CONFLICT (symbol, price_date)
+                (%(ticker)s, %(price_date)s, %(open_price)s, %(high_price)s,
+                 %(low_price)s, %(close_price)s, %(volume)s)
+            ON CONFLICT (ticker, price_date)
             DO UPDATE SET
                 open_price  = EXCLUDED.open_price,
                 high_price  = EXCLUDED.high_price,

@@ -15,8 +15,11 @@ x-airflow-common: &airflow-common
     ETF_DB_PASSWORD: ${POSTGRES_PASSWORD}
     # .NET API webhook — mirrors DATA_QUALITY_WEBHOOK_URL in load_to_db.py
     DATA_QUALITY_WEBHOOK_URL: http://etf-api:8080/api/data-quality/scan
+    # Backfill date range — mirrors BACKFILL_FROM/BACKFILL_TO in .env
+    BACKFILL_FROM: ${BACKFILL_FROM:-2024-01-01}
+    BACKFILL_TO: ${BACKFILL_TO:-2026-02-28}
     AIRFLOW__CORE__TEST_CONNECTION: "Enabled"
-    _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==0.2.40 pandas==2.2.2 pytest==8.2.0"
+    _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==1.2.0 pandas==2.2.2 pytest==8.2.0"
   volumes:
     - ../airflow/dags:/opt/airflow/dags
     - ../airflow/plugins:/opt/airflow/plugins
@@ -102,58 +105,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 40s
-
-  etf_prices_scraper:
-    build:
-      context: ../src/ingestion
-      dockerfile: Dockerfile
-      target: scraper
-    container_name: etf-prices-scraper
-    environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB:-etfinsight}
-      - POSTGRES_USER=${POSTGRES_USER:-etfinsight}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword123}
-      - PERIOD=${PERIOD:-5d}
-      - SCRAPER_INTERVAL_MINUTES=${SCRAPER_INTERVAL_MINUTES:-2}
-      - BACKFILL_FROM=${BACKFILL_FROM:-}
-      - BACKFILL_TO=${BACKFILL_TO:-}
-    volumes:
-      - etf_data:/app/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - etf-network
-    restart: unless-stopped
-    stop_grace_period: 30s # Wait up to 30 seconds for graceful shutdown
-
-  etf_prices_ingestor:
-    build:
-      context: ../src/ingestion
-      dockerfile: Dockerfile
-      target: ingestor
-    container_name: etf-prices-ingestor
-    environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB:-etfinsight}
-      - POSTGRES_USER=${POSTGRES_USER:-etfinsight}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devpassword123}
-      - INGESTOR_INTERVAL_MINUTES=${INGESTOR_INTERVAL_MINUTES:-1}
-      - DATA_QUALITY_WEBHOOK_URL=http://etf-api:8080/api/data-quality/scan
-    volumes:
-      - etf_data:/app/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-      etf_api:
-        condition: service_started  # Changed from service_healthy to service_started
-    networks:
-      - etf-network
-    restart: unless-stopped
-    stop_grace_period: 30s # Wait up to 30 seconds for graceful shutdown
 
   frontend:
     build:
@@ -249,6 +200,5 @@ networks:
 
 volumes:
   postgres_data:
-  etf_data:
   postgres_airflow_data:
   airflow_logs:

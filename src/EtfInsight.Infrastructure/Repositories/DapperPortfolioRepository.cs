@@ -18,28 +18,29 @@ namespace EtfInsight.Infrastructure.Repositories
             _db = db;
         }
 
-        public async Task<IEnumerable<Portfolio>> GetAllPortfoliosWithTransactionsAsync()
+        private async Task SetTenantContextAsync(Guid userId)
         {
+            // true = setting is local to the current transaction / connection
+            await _db.ExecuteAsync("SELECT set_config('app.user_id', @UserId, true)", 
+            new { UserId = userId.ToString() });
+        }
+
+        public async Task<IEnumerable<Portfolio>> GetAllPortfoliosWithTransactionsAsync(Guid userId)
+        {
+            await SetTenantContextAsync(userId);
+
             var sql = @"
-            SELECT 
-                id as id,
-                name as Name, 
-                currency as Currency, 
-                created_at as CreatedAt
-            FROM portfolios ORDER BY created_at DESC;
+                SELECT id, name, currency, created_at as CreatedAt
+                FROM portfolios
+                WHERE user_id = @UserId
+                ORDER BY created_at DESC;
 
-            SELECT 
-                id as Id,
-                portfolio_id as PortfolioId,
-                ticker as Ticker,
-                transaction_date as TransactionDate,
-                type as Type,
-                units as Units,
-                price_per_unit as PricePerUnit,
-                fees as Fees
-            FROM transactions ORDER BY transaction_date DESC;
-            ";
-
+                SELECT t.id, t.portfolio_id as PortfolioId, t.ticker, t.transaction_date as TransactionDate,
+                    t.type, t.units, t.price_per_unit as PricePerUnit, t.fees
+                FROM transactions t
+                INNER JOIN portfolios p ON p.id = t.portfolio_id
+                WHERE p.user_id = @UserId
+                ORDER BY t.transaction_date DESC;";
 
             using var multi = await _db.QueryMultipleAsync(sql);
 
@@ -59,8 +60,9 @@ namespace EtfInsight.Infrastructure.Repositories
             return portfolios;
         }
 
-        public async Task<Portfolio?> GetPortfolioWithTransactionsAsync(Guid id)
+        public async Task<Portfolio?> GetPortfolioWithTransactionsAsync(Guid id, Guid userId = default)
         {
+            await SetTenantContextAsync(userId);
 
             var sql = @"
             SELECT 
@@ -68,18 +70,24 @@ namespace EtfInsight.Infrastructure.Repositories
                 name as Name, 
                 currency as Currency, 
                 created_at as CreatedAt
-            FROM portfolios WHERE id = @Id;
+            FROM portfolios WHERE id = @Id
+            AND user_id = @UserId
+            ;
 
             SELECT 
-                id as Id,
-                portfolio_id as PortfolioId,
-                ticker as Ticker,
-                transaction_date as TransactionDate,
-                type as Type,
-                units as Units,
-                price_per_unit as PricePerUnit,
-                fees as Fees
-            FROM transactions WHERE portfolio_id = @Id ORDER BY transaction_date DESC;
+                t.id as Id,
+                t.portfolio_id as PortfolioId,
+                t.ticker as Ticker,
+                t.transaction_date as TransactionDate,
+                t.type as Type,
+                t.units as Units,
+                t.price_per_unit as PricePerUnit,
+                t.fees as Fees
+            FROM transactions t
+            INNER JOIN portfolios p ON p.id = t.portfolio_id
+            WHERE t.portfolio_id = @Id
+            AND p.user_id = @UserId
+            ORDER BY t.transaction_date DESC;
             ";
 
             using var multi = await _db.QueryMultipleAsync(sql, new { Id = id });

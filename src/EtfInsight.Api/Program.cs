@@ -143,6 +143,7 @@ app.Use(async (context, next) =>
     }
 });
 
+app.UseMiddleware<EtfInsight.Api.Middleware.GuestSessionMiddleware>();
 app.UseCors(DevCorsPolicy);
 
 // Configure middleware

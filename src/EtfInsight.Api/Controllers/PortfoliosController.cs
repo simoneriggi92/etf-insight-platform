@@ -5,6 +5,7 @@ using EtfInsight.Core.Entities;
 using EtfInsight.Core.Interfaces;
 using EtfInsight.Core.Services;
 using Microsoft.AspNetCore.Mvc;
+using EtfInsight.Api.Extensions;
 
 
 namespace EtfInsight.Api.Controllers;
@@ -41,7 +42,9 @@ public class PortfoliosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll()
     {
-        var portfolios = await _portfolioRepository.GetAllPortfoliosWithTransactionsAsync();
+        var userId = HttpContext.GetGuestId();
+
+        var portfolios = await _portfolioRepository.GetAllPortfoliosWithTransactionsAsync(userId);
 
         return Ok(portfolios);
     }
@@ -60,14 +63,13 @@ public class PortfoliosController : ControllerBase
             return BadRequest(new { Error = "Invalid portfolio ID." });
         }
 
-        var portfolio = await _portfolioRepository.GetPortfolioWithTransactionsAsync(id);
+        var userId = HttpContext.GetGuestId();
+        
+        var portfolio = await _portfolioRepository.GetPortfolioWithTransactionsAsync(id, userId);
 
-        if (portfolio == null)
-        {
-            return NotFound(new { Error = $"Portfolio with ID {id} not found." });
-        }
-
-        return Ok(new { portfolio });
+        return portfolio is null
+            ? NotFound(new { Error = $"Portfolio with ID {id} not found." })
+            : Ok(new { portfolio });
     }
 
     /// <summary>
@@ -83,22 +85,22 @@ public class PortfoliosController : ControllerBase
             return BadRequest(new { Error = "Portfolio name is required." });
         }
 
+        var userId = HttpContext.GetGuestId();
+
         var query = @"
-            INSERT INTO portfolios (name, description, base_currency)
-            VALUES (@Name, @Description, @BaseCurrency)
-            RETURNING id, name, description, base_currency, created_at";
+            INSERT INTO portfolios (name, currency, user_id)
+            VALUES (@Name, @Currency, @UserId)
+            RETURNING id, name, currency, created_at";
 
         var portfolio = await _db.QueryFirstAsync(query, new
         {
             Name = request.Name,
-            Description = request.Description ?? string.Empty,
-            BaseCurrency = request.BaseCurrency ?? "USD"
+            Currency = request.BaseCurrency ?? "EUR",
+            UserId = userId
         });
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = portfolio.id },
-            portfolio);
+        return CreatedAtAction(nameof(GetById), new { id = portfolio.id }, new { portfolio });
+
     }
 
     /// <summary>
@@ -109,6 +111,7 @@ public class PortfoliosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetTransactions(int portfolioId)
     {
+        var userId = HttpContext.GetGuestId();
         var portfolioExists = await _db.ExecuteScalarAsync<bool>(
             "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
             new { Id = portfolioId });
@@ -126,7 +129,7 @@ public class PortfoliosController : ControllerBase
             ORDER BY transaction_date DESC";
 
         var transactions = await _db.QueryAsync(query, new { PortfolioId = portfolioId });
-        return Ok(transactions);
+        return Ok(new { transactions });
     }
 
     /// <summary>

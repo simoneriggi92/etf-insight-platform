@@ -8,8 +8,9 @@
 ![Tailwind](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat&logo=tailwind-css)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker)
+![Apache Airflow](https://img.shields.io/badge/Apache%20Airflow-017CEE?style=flat&logo=Apache%20Airflow&logoColor=white)
 ![AI](https://img.shields.io/badge/AI-Ollama%20%2B%20RAG-orange?style=flat)
-![Status](https://img.shields.io/badge/Status-V1.0%20Release-brightgreen)
+![Status](https://img.shields.io/badge/Status-V2.0%20Active-brightgreen)
 
 ---
 
@@ -26,7 +27,7 @@ Most portfolio trackers show you *how much* you have. ETFInsight tells you *why*
 
 ## 🏗️ Architecture
 
-The solution follows **Clean Architecture**, **Domain-Driven Design (DDD)**, and operates within an isolated Docker network using an **API-Gateway / Reverse Proxy** pattern.
+The solution follows **Clean Architecture**, **Domain-Driven Design (DDD)**, and operates within an isolated Docker network using an **API-Gateway / Reverse Proxy** pattern, orchestrated by **Apache Airflow** for robust data pipelines.
 
 ```mermaid
 graph TD
@@ -43,10 +44,15 @@ graph TD
         Engine & Hangfire --> DB[(PostgreSQL + pgvector)]
         RAG --> DB
         RAG --> Ollama[Ollama Local LLM]
+        
+        subgraph "Data Engineering (Airflow)"
+            AirflowUI[Airflow Webserver]
+            Scheduler[Airflow Scheduler] -->|Triggers DAGs| Worker[Local Executor]
+            Worker -->|Extract & Transform| YF[Market Data APIs]
+            Worker -->|Load ON CONFLICT| DB
+            Worker -->|Webhook Trigger| API
+        end
     end
-    
-    Scraper[Python Ingestion] -->|INSERT| DB
-    Scraper -->|Webhook Trigger| API
 ```
 ---
 
@@ -67,8 +73,8 @@ graph TD
 ### Data Quality & Event-Driven Workers
 - Utilizes Hangfire backed by PostgreSQL to run resilient, asynchronous background jobs (anomaly detection, flash-crash protection).
 
-### Data Ingestion (Python)
-- Autonomous dockerized scraper to fetch EOD (End-of-Day) market data.
+### Data Engineering & ETL (Apache Airflow)
+- Robust data pipelines managed via Directed Acyclic Graphs (DAGs). Handles scheduled End-of-Day (EOD) ingestion, parameterized historical backfills, and triggers asynchronous data quality scans.
 
 ---
 ## 📸 Screenshots
@@ -110,12 +116,22 @@ The V1.0 of the project followed a strict 6-Month Architectural Roadmap, which i
 
 - [x] Production Infrastructure: Dockerized multi-stage builds with Nginx Reverse Proxy.
 
+### ✅ Phase 7: Data Engineering (V2 Kickoff)
+
+- [x] Replaced legacy scheduled scripts with Apache Airflow.
+      
+- [x] Idempotent ETL pipelines (DAGs) for Daily Ingestion and Historical Backfills.
+
+
 ### 🔮 V2 Vision: SaaS & Scale (Upcoming)
-- [ ] Data Engineering: Scaling ingestion from 50 to 5,000+ ETFs using Apache Airflow.
 
-- [ ] Multi-Tenancy: Row-Level Security (RLS) and user isolation.
+- [ ] Multi-Tenancy: Row-Level Security (RLS), Tenant IDs, and user isolation for frictionless onboarding (Guest mode).
 
-- [ ] Performance: Redis caching layer for heavy historical aggregations.
+- [ ] Just-in-Time (JIT) Ingestion: Airflow DAGs triggered dynamically by .NET API when a user requests a new ticker.
+      
+- [ ] Scale Ingestion: Implementing Airflow Pools and rate-limiting to safely scale from 50 to 5,000+ ETFs.
+
+- [ ] Automated AI Pipeline: Airflow DAGs to automatically download, parse, and embed PDF Factsheets/KIIDs.
 
 
 ---
@@ -150,6 +166,7 @@ docker-compose up --build -d
 
 4) Access the system
 - Web App (UI): http://localhost:3000
+- Airflow Dashboard: http://localhost:8090
 - Hangfire Dashboard: http://localhost:3000/api/hangfire (if exposed via proxy)
 - Swagger API: http://localhost:3000/api/swagger
 ---

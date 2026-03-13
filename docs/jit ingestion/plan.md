@@ -31,35 +31,35 @@
 
 #### 0.1 Database
 
-- [ ] **0.1.1** Write migration `07_multi_tenancy.sql`
+- [x] **0.1.1** Write migration `07_multi_tenancy.sql`
   - Add `user_id UUID` column to `portfolios` (nullable, no default — preserves seed data)
   - Create index `idx_portfolios_user_id`
-- [ ] **0.1.2** Write RLS policies in the same migration (or `07b_rls.sql`)
+- [x] **0.1.2** Write RLS policies in the same migration (or `07b_rls.sql`)
   - `ALTER TABLE portfolios ENABLE ROW LEVEL SECURITY`
   - Create policy `portfolios_tenant_isolation` scoped to `current_setting('app.user_id')`
   - Document how to disable RLS for superuser migrations
-- [ ] **0.1.3** Apply migration against local Docker Postgres; verify seed portfolios still load
+- [x] **0.1.3** Apply migration against local Docker Postgres; verify seed portfolios still load
 
 #### 0.2 .NET API — Guest Session
 
-- [ ] **0.2.1** Create `Middleware/GuestSessionMiddleware.cs`
+- [x] **0.2.1** Create `Middleware/GuestSessionMiddleware.cs`
   - Read `X-Guest-ID` header; parse as `Guid`; fall back to a new `Guid.NewGuid()` if absent
   - Store resolved id in `HttpContext.Items`
-- [ ] **0.2.2** Create `Extensions/HttpContextExtensions.cs` with `GetGuestId()` helper
-- [ ] **0.2.3** Register middleware in `Program.cs` (before routing)
-- [ ] **0.2.4** Add `SetTenantContextAsync` helper to `DapperPortfolioRepository` that calls
+- [x] **0.2.2** Create `Extensions/HttpContextExtensions.cs` with `GetGuestId()` helper
+- [x] **0.2.3** Register middleware in `Program.cs` (before routing)
+- [x] **0.2.4** Add `SetTenantContextAsync` helper to `DapperPortfolioRepository` that calls
       `set_config('app.user_id', …)` before every query
-- [ ] **0.2.5** Update `PortfoliosController.Create` to persist `user_id` from middleware
-- [ ] **0.2.6** Update `PortfoliosController.GetAll` / `GetById` to filter by `user_id`
-- [ ] **0.2.7** Write unit tests for middleware (missing header → auto-generate, invalid UUID →
+- [x] **0.2.5** Update `PortfoliosController.Create` to persist `user_id` from middleware
+- [x] **0.2.6** Update `PortfoliosController.GetAll` / `GetById` to filter by `user_id`
+- [x] **0.2.7** Write unit tests for middleware (missing header → auto-generate, invalid UUID →
       auto-generate, valid UUID → reused)
 
 #### 0.3 Frontend — Guest Session
 
-- [ ] **0.3.1** Create `src/composables/useGuestSession.ts`
+- [x] **0.3.1** Create `src/composables/useGuestSession.ts`
   - Generate UUID via `crypto.randomUUID()` on first visit; persist in `localStorage`
   - Export reactive `guestId` ref
-- [ ] **0.3.2** Update `src/api/client.ts` Axios instance to attach `X-Guest-ID` header via
+- [x] **0.3.2** Update `src/api/client.ts` Axios instance to attach `X-Guest-ID` header via
       request interceptor
 
 ---
@@ -68,18 +68,18 @@
 
 #### 1.1 Database
 
-- [ ] **1.1.1** Write migration `08_etf_ingestion_status.sql`
+- [x] **1.1.1** Write migration `08_etf_ingestion_status.sql`
   - Create `etf_ingestion_status` enum: `unknown`, `pending`, `ingesting`, `ready`, `error`
   - Add columns to `etf_metadata`: `status`, `ingestion_requested_at`, `ingestion_completed_at`,
     `ingestion_error`
   - `UPDATE etf_metadata SET status = 'ready' WHERE is_active = true` (backfill)
-- [ ] **1.1.2** Apply migration; confirm existing tickers show `status = 'ready'`
+- [x] **1.1.2** Apply migration; confirm existing tickers show `status = 'ready'`
 
 #### 1.2 Airflow — ETFDatabaseHook
 
-- [ ] **1.2.1** Add `upsert_etf_metadata(ticker, status)` method to `ETFDatabaseHook`
+- [x] **1.2.1** Add `upsert_etf_metadata(ticker, status)` method to `ETFDatabaseHook`
   - Used by `etf_backfill_jit` to update status at the end of a run
-- [ ] **1.2.2** Add `get_ticker_status(ticker) → str` method for potential DAG-side checks
+- [x] **1.2.2** Add `get_ticker_status(ticker) → str` method for potential DAG-side checks
 
 ---
 

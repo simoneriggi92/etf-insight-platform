@@ -54,3 +54,47 @@ class ETFDatabaseHook(PostgresHook):
         conn.commit()
         cur.close()
         return affected
+
+    def upsert_metadata(
+        self, ticker: str, status: str, ingestion_error: str | None = None
+    ) -> None:
+        """
+        Insert a placeholder row for a new ticker, or update the status of an existing one. Called by etf_backfill_jit at completion/failure.
+        """
+
+        sql = """
+            INSERT INTO etf_metadata (ticker, name, status, is_active, ingestion_requested_at)
+            VALUES (%(ticker)s, %(name)s, %(status)s::etf_ingestion_status, FALSE, NOW())
+            ON CONFLICT (ticker) DO UPDATE
+                SET status                 = EXCLUDED.status::etf_ingestion_status,
+                    is_active              = (%(status)s = 'ready'),
+                    ingestion_completed_at = CASE
+                        WHEN %(status)s = 'ready' THEN NOW()
+                        ELSE etf_metadata.ingestion_completed_at
+                    END,
+                    ingestion_error        = %(ingestion_error)s;
+        """
+        conn = self.get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            sql,
+            {
+                "ticker": ticker,
+                "name": ticker,  # placeholder; can be enriched later
+                "status": status,
+                "ingestion_error": ingestion_error,
+            },
+        )
+        conn.commit()
+        cur.close()
+
+    def get_ticker_status(self, ticker: str) -> str | None:
+        """
+        Returns the current ingestion status for a ticker, or None if not found.
+        Useful for DAG-side guard checks before triggering redundant runs.
+        """
+        rows = self.get_records(
+            "SELECT status FROM etf_metadata WHERE ticker = %s",
+            parameters=[ticker],
+        )
+        return rows[0][0] if rows else None

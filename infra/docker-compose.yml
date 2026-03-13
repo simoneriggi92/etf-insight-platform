@@ -15,6 +15,8 @@ x-airflow-common: &airflow-common
     ETF_DB_PASSWORD: ${POSTGRES_PASSWORD}
     # .NET API webhook — mirrors DATA_QUALITY_WEBHOOK_URL in load_to_db.py
     DATA_QUALITY_WEBHOOK_URL: http://etf-api:8080/api/data-quality/scan
+    DOTNET_API_CALLBACK_URL: http://etf-api:8080/api/ingestion/callback
+    AIRFLOW_CALLBACK_SECRET: dev-callback-secret-changeme #used in phase 3
     # Backfill date range — mirrors BACKFILL_FROM/BACKFILL_TO in .env
     BACKFILL_FROM: ${BACKFILL_FROM:-2024-01-01}
     BACKFILL_TO: ${BACKFILL_TO:-2026-02-28}

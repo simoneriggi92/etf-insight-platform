@@ -87,31 +87,31 @@
 
 #### 2.1 Airflow — `etf_backfill_jit` DAG
 
-- [ ] **2.1.1** Create `airflow/dags/etf_jit_ingest.py`
+- [x] **2.1.1** Create `airflow/dags/etf_jit_ingest.py`
   - DAG params: `ticker` (required), `date_from` (default `2015-01-01`), `date_to` (default today)
   - Task `fetch_and_load`: call existing `fetch_raw_prices_range` → `normalize_prices` →
     `validate_prices` → `hook.upsert_prices()`
   - Task `notify_api`: POST to `DOTNET_API_CALLBACK_URL` env var with `{"ticker", "status": "ready"}`
   - `on_failure_callback`: set `status = 'error'` in `etf_metadata` via hook
   - Set `max_active_runs=10` to allow parallel ingestions
-- [ ] **2.1.2** Add `DOTNET_API_CALLBACK_URL` to `docker-compose.yml` Airflow service env
-- [ ] **2.1.3** Manually trigger DAG for a test ticker (e.g. `VWCE.DE`) from Airflow UI; confirm
+- [x] **2.1.2** Add `DOTNET_API_CALLBACK_URL` to `docker-compose.yml` Airflow service env
+- [x] **2.1.3** Manually trigger DAG for a test ticker (e.g. `VWCE.DE`) from Airflow UI; confirm
       prices land in `etf_prices` and `status` flips to `ready`
 
 #### 2.2 .NET API — `AirflowIngestionService`
 
-- [ ] **2.2.1** Add `IIngestionService` interface to `EtfInsight.Core/Interfaces/`
+- [x] **2.2.1** Add `IIngestionService` interface to `EtfInsight.Core/Interfaces/`
   - Single method: `Task<IngestionStatus> EnsureTickerReadyAsync(string ticker, CancellationToken ct)`
-- [ ] **2.2.2** Add `IngestionStatus` enum (`Ready`, `Ingesting`, `Error`) to `EtfInsight.Core`
-- [ ] **2.2.3** Create `Infrastructure/Services/AirflowIngestionService.cs`
+- [x] **2.2.2** Add `IngestionStatus` enum (`Ready`, `Ingesting`, `Error`) to `EtfInsight.Core`
+- [x] **2.2.3** Create `Infrastructure/Services/AirflowIngestionService.cs`
   - Reads `Airflow:BaseUrl`, `Airflow:Username`, `Airflow:Password` from `IConfiguration`
   - Upserts `etf_metadata` placeholder row (`status='pending'`) before triggering DAG
   - POSTs to Airflow REST API `/api/v1/dags/etf_backfill_jit/dagRuns` with Basic auth
   - Sets `status='ingesting'` on success, `status='error'` on HTTP failure
   - Guards against duplicate triggers via `ON CONFLICT DO NOTHING`
-- [ ] **2.2.4** Add Airflow config section to `appsettings.Development.json`
-- [ ] **2.2.5** Register `IIngestionService` → `AirflowIngestionService` as scoped in `Program.cs`
-- [ ] **2.2.6** Register named `HttpClient("Airflow")` in `Program.cs`
+- [x] **2.2.4** Add Airflow config section to `appsettings.Development.json`
+- [x] **2.2.5** Register `IIngestionService` → `AirflowIngestionService` as scoped in `Program.cs`
+- [x] **2.2.6** Register named `HttpClient("Airflow")` in `Program.cs`
 
 #### 2.3 .NET API — Update `PortfoliosController.AddTransaction`
 

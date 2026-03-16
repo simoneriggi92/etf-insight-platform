@@ -115,11 +115,11 @@
 
 #### 2.3 .NET API — Update `PortfoliosController.AddTransaction`
 
-- [ ] **2.3.1** Inject `IIngestionService` into `PortfoliosController`
-- [ ] **2.3.2** Before inserting the transaction, call `EnsureTickerReadyAsync(ticker)`
-- [ ] **2.3.3** Return `201 Created` if status is `ready`; return `202 Accepted` with ingestion
+- [x] **2.3.1** Inject `IIngestionService` into `PortfoliosController`
+- [x] **2.3.2** Before inserting the transaction, call `EnsureTickerReadyAsync(ticker)`
+- [x] **2.3.3** Return `201 Created` if status is `ready`; return `202 Accepted` with ingestion
       metadata if status is `ingesting`
-- [ ] **2.3.4** Write integration test: submit transaction for unknown ticker → expect `202` +
+- [x] **2.3.4** Write integration test: submit transaction for unknown ticker → expect `202` +
       `etf_metadata` row with `status='ingesting'` or `'pending'`
 
 ---

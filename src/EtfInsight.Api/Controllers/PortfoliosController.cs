@@ -138,13 +138,13 @@ public class PortfoliosController : ControllerBase
     /// <summary>
     /// Add a transaction to a portfolio
     /// </summary>
-    [HttpPost("{portfolioId:int}/transactions")]
+    [HttpPost("{portfolioId:guid}/transactions")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AddTransaction(
-        int portfolioId,
+        Guid portfolioId,
         [FromBody] TransactionCreateRequest request,
         CancellationToken ct = default)
     {

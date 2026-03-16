@@ -21,6 +21,7 @@ x-airflow-common: &airflow-common
     BACKFILL_FROM: ${BACKFILL_FROM:-2024-01-01}
     BACKFILL_TO: ${BACKFILL_TO:-2026-02-28}
     AIRFLOW__CORE__TEST_CONNECTION: "Enabled"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
     _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==1.2.0 pandas==2.2.2 pytest==8.2.0"
   volumes:
     - ../airflow/dags:/opt/airflow/dags
@@ -93,6 +94,10 @@ services:
       - DataQuality__FlashCrashThresholdPercent=20.0
       - DataQuality__EnableAutoScan=true
       - DataQuality__ScanIntervalMinutes=5
+      - Airflow__BaseUrl=http://etf-airflow-webserver:8080
+      - Airflow__Username=${AIRFLOW_USERNAME:-admin}
+      - Airflow__Password=${AIRFLOW_PASSWORD:-admin}
+      - Airflow__CallbackSecret=${AIRFLOW_CALLBACK_SECRET:-dev-callback-secret-changeme}
     depends_on:
       postgres:
         condition: service_healthy

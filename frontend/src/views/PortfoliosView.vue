@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { usePortfoliosStore } from '../stores/portfolios'
 import PortfolioKpiRow      from '../components/portfolios/PortfolioKpiRow.vue'
 import AllocationChart      from '../components/portfolios/AllocationChart.vue'
 import PortfolioValueChart  from '../components/portfolios/PortfolioValueChart.vue'
 import DrawdownChart        from '../components/portfolios/DrawdownChart.vue'
 import HoldingsTable        from '../components/portfolios/HoldingsTable.vue'
+import AddTransactionForm from '../components/portfolios/AddTransactionForm.vue'
 
+const showAddTx = ref(false)
 const store = usePortfoliosStore()
 
 onMounted(() =>{
@@ -66,6 +68,23 @@ onMounted(() =>{
         >
           Apply
         </button>
+      </div>
+
+      <div class="flex justify-end mb-4">
+        <button
+          class="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent transition-colors"
+          @click="showAddTx = !showAddTx">
+          {{ showAddTx ? '✕ Cancel' : '+ Add Transaction' }}
+        </button>
+      </div>
+
+      <!-- Add Transaction form (collapsible) -->
+      <div v-if="showAddTx && store.activeId"
+        class="mb-6 rounded-lg border border-border bg-card p-4">
+        <h3 class="text-sm font-semibold mb-3">Add Transaction</h3>
+        <AddTransactionForm
+          :portfolio-id="store.activeId"
+          @done="async () => { showAddTx = false; await store.fetchPortfolios(); if (store.activeId) store.selectPortfolio(store.activeId) }" />
       </div>
 
       <!-- KPIs -->

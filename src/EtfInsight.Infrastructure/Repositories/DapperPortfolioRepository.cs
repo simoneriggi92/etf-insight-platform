@@ -21,7 +21,7 @@ namespace EtfInsight.Infrastructure.Repositories
         private async Task SetTenantContextAsync(Guid userId)
         {
             // true = setting is local to the current transaction / connection
-            await _db.ExecuteAsync("SELECT set_config('app.user_id', @UserId, true)", 
+            await _db.ExecuteAsync("SELECT set_config('app.user_id', @UserId, true)",
             new { UserId = userId.ToString() });
         }
 
@@ -42,7 +42,7 @@ namespace EtfInsight.Infrastructure.Repositories
                 WHERE p.user_id = @UserId
                 ORDER BY t.transaction_date DESC;";
 
-            using var multi = await _db.QueryMultipleAsync(sql);
+            using var multi = await _db.QueryMultipleAsync(sql, new { UserId = userId });
 
             var portfolios = (await multi.ReadAsync<Portfolio>()).ToList();
             var transactions = (await multi.ReadAsync<Transaction>()).ToList();
@@ -64,14 +64,18 @@ namespace EtfInsight.Infrastructure.Repositories
         {
             await SetTenantContextAsync(userId);
 
-            var sql = @"
+            // When userId is Guid.Empty (internal calls, e.g. from PortfolioAnalyticsService),
+            // skip the user_id filter so analytics can access any portfolio.
+            var userFilter = userId == Guid.Empty ? "" : "AND user_id = @UserId";
+
+            var sql = $@"
             SELECT 
                 id as id,
                 name as Name, 
                 currency as Currency, 
                 created_at as CreatedAt
             FROM portfolios WHERE id = @Id
-            AND user_id = @UserId
+            {userFilter}
             ;
 
             SELECT 
@@ -86,11 +90,11 @@ namespace EtfInsight.Infrastructure.Repositories
             FROM transactions t
             INNER JOIN portfolios p ON p.id = t.portfolio_id
             WHERE t.portfolio_id = @Id
-            AND p.user_id = @UserId
+            {userFilter}
             ORDER BY t.transaction_date DESC;
             ";
 
-            using var multi = await _db.QueryMultipleAsync(sql, new { Id = id });
+            using var multi = await _db.QueryMultipleAsync(sql, new { Id = id, UserId = userId });
 
             var portfolio = await multi.ReadSingleOrDefaultAsync<Portfolio>();
 

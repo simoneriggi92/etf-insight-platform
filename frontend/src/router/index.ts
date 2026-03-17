@@ -17,6 +17,16 @@ const router = createRouter({
           name: 'portfolios',
           component: () => import('../views/PortfoliosView.vue'),
         },
+        { 
+          path: 'portfolios/new', 
+          name: 'portfolio-create', 
+          component: () => import('../views/PortfolioCreateView.vue')
+        },
+        { 
+          path: 'portfolios/:id', 
+          name: 'portfolio-detail', 
+          component: () => import('../views/PortfoliosView.vue')
+        },
         {
           path: 'data-quality',
           name: 'data-quality',

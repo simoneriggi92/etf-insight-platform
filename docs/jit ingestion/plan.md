@@ -128,13 +128,13 @@
 
 #### 3.1 .NET API — `IngestionController`
 
-- [ ] **3.1.1** Create `Controllers/IngestionController.cs`
+- [x] **3.1.1** Create `Controllers/IngestionController.cs`
   - `POST /api/ingestion/callback` — called by Airflow; updates `etf_metadata.status`
   - `GET /api/ingestion/{ticker}/status` — polled by frontend; returns status row
-- [ ] **3.1.2** Add `IngestionCallbackRequest` record (Ticker, Status, Error?, DagRunId?)
-- [ ] **3.1.3** Secure the callback endpoint: validate a shared secret header
+- [x] **3.1.2** Add `IngestionCallbackRequest` record (Ticker, Status, Error?, DagRunId?)
+- [x] **3.1.3** Secure the callback endpoint: validate a shared secret header
       (`X-Callback-Secret`) to prevent spoofing; store secret in `appsettings` / env var
-- [ ] **3.1.4** Write unit tests for both endpoints (happy path + unknown ticker 404)
+- [x] **3.1.4** Write unit tests for both endpoints (happy path + unknown ticker 404)
 
 ---
 
@@ -142,37 +142,37 @@
 
 #### 4.1 Portfolio Management
 
-- [ ] **4.1.1** Create `src/api/portfolios.ts` with `createPortfolio`, `getPortfolio`,
+- [x] **4.1.1** Create `src/api/portfolios.ts` with `createPortfolio`, `getPortfolio`,
       `listPortfolios` functions
-- [ ] **4.1.2** Create `src/views/PortfolioCreateView.vue`
+- [x] **4.1.2** Create `src/views/PortfolioCreateView.vue`
   - Form fields: name, base currency (EUR/USD/GBP)
   - On success, redirect to `PortfolioDashboardView`
-- [ ] **4.1.3** Create `src/views/PortfolioDashboardView.vue`
+- [x] **4.1.3** Create `src/views/PortfolioDashboardView.vue`
   - List positions, show TWRR (disabled/skeleton when ingestion is pending)
   - "Add Transaction" CTA button
-- [ ] **4.1.4** Add routes to `src/router/index.ts`:
+- [x] **4.1.4** Add routes to `src/router/index.ts`:
       `/portfolios/new`, `/portfolios/:id`, `/portfolios/:id/add-transaction`
 
 #### 4.2 Transaction Form + JIT Banner
 
-- [ ] **4.2.1** Create `src/components/AddTransactionForm.vue`
+- [x] **4.2.1** Create `src/components/AddTransactionForm.vue`
   - Fields: ticker, date, type (BUY/SELL), units, price per unit, fees, currency
   - Client-side validation (non-empty ticker, positive numbers, valid date)
-- [ ] **4.2.2** Implement JIT status banner inside the form component
+- [x] **4.2.2** Implement JIT status banner inside the form component
   - `ingesting` state: spinner + friendly message
   - `error` state: error message + "Retry" button that re-submits the transaction
-- [ ] **4.2.3** Create `src/composables/useIngestionPolling.ts`
+- [x] **4.2.3** Create `src/composables/useIngestionPolling.ts`
   - Poll `GET /api/ingestion/{ticker}/status` every 3 s
   - Auto-stop on `ready` or `error`; clean up interval on component unmount
-- [ ] **4.2.4** Create `src/views/AddTransactionView.vue` that wraps the form component and wires
+- [x] **4.2.4** Create `src/views/AddTransactionView.vue` that wraps the form component and wires
       polling composable
 
 #### 4.3 UX Polish
 
-- [ ] **4.3.1** Add a global "My Portfolios" nav link visible on all pages
-- [ ] **4.3.2** Show a subtle persistent badge (e.g. 🔄 spinner) in the nav/portfolio header when
+- [x] **4.3.1** Add a global "My Portfolios" nav link visible on all pages
+- [x] **4.3.2** Show a subtle persistent badge (e.g. 🔄 spinner) in the nav/portfolio header when
       any ticker is still ingesting
-- [ ] **4.3.3** Auto-refresh the dashboard TWRR section once the last pending ticker transitions to
+- [x] **4.3.3** Auto-refresh the dashboard TWRR section once the last pending ticker transitions to
       `ready`
 
 ---

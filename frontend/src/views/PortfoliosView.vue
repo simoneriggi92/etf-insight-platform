@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
 import { onMounted, ref } from 'vue'
 import { usePortfoliosStore } from '../stores/portfolios'
 import PortfolioKpiRow      from '../components/portfolios/PortfolioKpiRow.vue'
@@ -70,7 +71,13 @@ onMounted(() =>{
         </button>
       </div>
 
-      <div class="flex justify-end mb-4">
+      <div class="flex justify-end gap-2 mb-4">
+        <RouterLink
+          v-if="store.activeId"
+          :to="`/portfolios/${store.activeId}/import`"
+          class="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent transition-colors">
+          📥 Import CSV
+        </RouterLink>
         <button
           class="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent transition-colors"
           @click="showAddTx = !showAddTx">

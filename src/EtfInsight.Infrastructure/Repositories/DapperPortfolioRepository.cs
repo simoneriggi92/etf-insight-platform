@@ -106,5 +106,26 @@ namespace EtfInsight.Infrastructure.Repositories
 
             return portfolio;
         }
+
+        public async Task BulkAddTransactionsAsync(Guid portfolioId, IEnumerable<Transaction> transactions)
+        {
+            const string sql = """
+                INSERT INTO transactions
+                    (portfolio_id, ticker, type, units, price_per_unit, fees, transaction_date)
+                VALUES
+                    (@PortfolioId, @Ticker, @Type, @Units, @PricePerUnit, @Fees, @TransactionDate)
+                """;
+
+            await _db.ExecuteAsync(sql, transactions.Select(t => new
+            {
+                PortfolioId = portfolioId,
+                Ticker = t.Ticker,
+                Type = t.Type.ToString(),
+                Units = t.Units,
+                PricePerUnit = t.PricePerUnit,
+                Fees = t.Fees,
+                TransactionDate = t.TransactionDate.ToDateTime(TimeOnly.MinValue), // Dapper doesn't support DateOnly natively
+            }));
+        }
     }
 }

@@ -99,6 +99,7 @@ builder.Services.AddScoped<EtfInsight.DataQuality.Interfaces.IEtfPriceRepository
 // Data Quality - Register scanner
 builder.Services.AddScoped<DataQualityScanner>();
 builder.Services.AddScoped<EtfInsight.Core.Interfaces.IIngestionService, AirflowIngestionService>();
+builder.Services.AddScoped<EtfInsight.Core.Interfaces.ICsvImportService, CsvImportService>();
 
 var app = builder.Build();
 

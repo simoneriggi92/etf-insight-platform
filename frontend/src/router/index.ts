@@ -32,6 +32,11 @@ const router = createRouter({
           name: 'data-quality',
           component: () => import('../views/DataQualityView.vue'),
         },
+        {
+          path: 'portfolios/:id/import',
+          name: 'csv-import',
+          component: () => import('../views/CsvImportView.vue'),
+        },
       ],
     },
   ],

@@ -167,7 +167,7 @@ services:
   airflow-webserver:
     <<: *airflow-common
     container_name: etf-airflow-webserver
-    command: webserver
+    command: bash -c "rm -f /opt/airflow/airflow-webserver.pid && airflow webserver"
     ports:
       - "8090:8080"
     depends_on:

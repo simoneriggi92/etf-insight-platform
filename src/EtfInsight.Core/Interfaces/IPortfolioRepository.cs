@@ -11,5 +11,7 @@ namespace EtfInsight.Core.Interfaces
         Task<Portfolio?> GetPortfolioWithTransactionsAsync(Guid id, Guid userId = default);
 
         Task<IEnumerable<Portfolio>> GetAllPortfoliosWithTransactionsAsync(Guid userId);
+
+        Task BulkAddTransactionsAsync(Guid portfolioId, IEnumerable<Transaction> transactions);
     }
 }

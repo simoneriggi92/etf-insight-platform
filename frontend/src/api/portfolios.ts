@@ -41,4 +41,14 @@ export const portfoliosApi = {
   getSummary: (portfolioId: string, from?: string, to?: string) =>
     apiClient.get<PortfolioSummaryDto>(`/portfolios/${portfolioId}/analytics/summary`,
        { params: { from, to } }),
+       
+  importCsv: (portfolioId: string, file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return apiClient.post(
+    `/portfolios/${portfolioId}/transactions/import`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' }, validateStatus: s => s < 500 }
+  )
+},
 }

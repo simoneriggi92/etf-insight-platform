@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from 'vue-router'
+import { useIngestionStore } from '../stores/ingestion'
 
 const props = defineProps<{ open?: boolean }>()
 const emit  = defineEmits<{ (e: 'close'): void }>()
 
 const route = useRoute()
+const ingestionStore = useIngestionStore()
 
 const navItems = [
   { to: '/',             label: 'Dashboard',    icon: '⬛' },
   { to: '/portfolios',   label: 'Portfolios',   icon: '📊' },
+  { to: '/portfolios/new',  label: 'New Portfolio',  icon: '➕' },
   { to: '/data-quality', label: 'Data Quality', icon: '🛡️' },
 ]
 
@@ -70,6 +73,8 @@ function handleNavClick() {
         >
           <span>{{ item.icon }}</span>
           <span>{{ item.label }}</span>
+          <span v-if="item.to === '/portfolios' && ingestionStore.isIngesting"
+            class="ml-auto text-xs animate-spin">⟳</span>
         </RouterLink>
       </nav>
 

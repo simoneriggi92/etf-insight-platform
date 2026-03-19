@@ -37,6 +37,8 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? "Host=localhost;Port=5432;Database=etfinsight;Username=etfinsight;Password=devpassword123";
 
 builder.Services.AddHttpClient("Ollama");
+builder.Services.AddHttpClient("Airflow");
+
 
 // Hangfire configuration
 builder.Services.AddHangfire(config => config
@@ -96,7 +98,8 @@ builder.Services.AddScoped<EtfInsight.DataQuality.Interfaces.IEtfPriceRepository
 
 // Data Quality - Register scanner
 builder.Services.AddScoped<DataQualityScanner>();
-
+builder.Services.AddScoped<EtfInsight.Core.Interfaces.IIngestionService, AirflowIngestionService>();
+builder.Services.AddScoped<EtfInsight.Core.Interfaces.ICsvImportService, CsvImportService>();
 
 var app = builder.Build();
 
@@ -143,6 +146,7 @@ app.Use(async (context, next) =>
     }
 });
 
+app.UseMiddleware<EtfInsight.Api.Middleware.GuestSessionMiddleware>();
 app.UseCors(DevCorsPolicy);
 
 // Configure middleware

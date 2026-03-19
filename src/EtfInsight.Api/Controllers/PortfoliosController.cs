@@ -5,6 +5,7 @@ using EtfInsight.Core.Entities;
 using EtfInsight.Core.Interfaces;
 using EtfInsight.Core.Services;
 using Microsoft.AspNetCore.Mvc;
+using EtfInsight.Api.Extensions;
 
 
 namespace EtfInsight.Api.Controllers;
@@ -18,6 +19,7 @@ public class PortfoliosController : ControllerBase
     private readonly IPortfolioRepository _portfolioRepository;
     private readonly IEtfPriceRepository _etfPriceRepository;
     private readonly IPortfolioAnalyticsService _portfolioAnalyticsService;
+    private readonly IIngestionService _ingestionService;
     private readonly ILogger<PortfoliosController> _logger;
 
     public PortfoliosController(
@@ -25,12 +27,14 @@ public class PortfoliosController : ControllerBase
         IPortfolioRepository portfolioRepository,
         IEtfPriceRepository etfPriceRepository,
         IPortfolioAnalyticsService portfolioAnalyticsService,
+        IIngestionService ingestionService,
         ILogger<PortfoliosController> logger)
     {
         _db = db;
         _portfolioRepository = portfolioRepository;
         _etfPriceRepository = etfPriceRepository;
         _portfolioAnalyticsService = portfolioAnalyticsService;
+        _ingestionService = ingestionService;
         _logger = logger;
     }
 
@@ -41,7 +45,9 @@ public class PortfoliosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll()
     {
-        var portfolios = await _portfolioRepository.GetAllPortfoliosWithTransactionsAsync();
+        var userId = HttpContext.GetGuestId();
+
+        var portfolios = await _portfolioRepository.GetAllPortfoliosWithTransactionsAsync(userId);
 
         return Ok(portfolios);
     }
@@ -60,14 +66,13 @@ public class PortfoliosController : ControllerBase
             return BadRequest(new { Error = "Invalid portfolio ID." });
         }
 
-        var portfolio = await _portfolioRepository.GetPortfolioWithTransactionsAsync(id);
+        var userId = HttpContext.GetGuestId();
 
-        if (portfolio == null)
-        {
-            return NotFound(new { Error = $"Portfolio with ID {id} not found." });
-        }
+        var portfolio = await _portfolioRepository.GetPortfolioWithTransactionsAsync(id, userId);
 
-        return Ok(new { portfolio });
+        return portfolio is null
+            ? NotFound(new { Error = $"Portfolio with ID {id} not found." })
+            : Ok(new { portfolio });
     }
 
     /// <summary>
@@ -83,32 +88,33 @@ public class PortfoliosController : ControllerBase
             return BadRequest(new { Error = "Portfolio name is required." });
         }
 
+        var userId = HttpContext.GetGuestId();
+
         var query = @"
-            INSERT INTO portfolios (name, description, base_currency)
-            VALUES (@Name, @Description, @BaseCurrency)
-            RETURNING id, name, description, base_currency, created_at";
+            INSERT INTO portfolios (name, currency, user_id)
+            VALUES (@Name, @Currency, @UserId)
+            RETURNING id, name, currency, created_at";
 
         var portfolio = await _db.QueryFirstAsync(query, new
         {
             Name = request.Name,
-            Description = request.Description ?? string.Empty,
-            BaseCurrency = request.BaseCurrency ?? "USD"
+            Currency = request.BaseCurrency ?? "EUR",
+            UserId = userId
         });
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = portfolio.id },
-            portfolio);
+        return CreatedAtAction(nameof(GetById), new { id = portfolio.id }, new { portfolio });
+
     }
 
     /// <summary>
     /// Get portfolio transactions
     /// </summary>
     [HttpGet("{portfolioId:int}/transactions")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetTransactions(int portfolioId)
     {
+        var userId = HttpContext.GetGuestId();
         var portfolioExists = await _db.ExecuteScalarAsync<bool>(
             "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
             new { Id = portfolioId });
@@ -126,83 +132,108 @@ public class PortfoliosController : ControllerBase
             ORDER BY transaction_date DESC";
 
         var transactions = await _db.QueryAsync(query, new { PortfolioId = portfolioId });
-        return Ok(transactions);
+        return Ok(new { transactions });
     }
 
     /// <summary>
     /// Add a transaction to a portfolio
     /// </summary>
-    [HttpPost("{portfolioId:int}/transactions")]
+    [HttpPost("{portfolioId:guid}/transactions")]
     [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AddTransaction(
-        int portfolioId,
-        [FromBody] TransactionCreateRequest request)
+        Guid portfolioId,
+        [FromBody] TransactionCreateRequest request,
+        CancellationToken ct = default)
     {
+        // -- Validation --
+        var ticker = request.Ticker.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(ticker))
+        {
+            return BadRequest(new { Error = "Ticker is required." });
+        }
+
+        if (request.Units <= 0)
+        {
+            return BadRequest(new { Error = "Units must be greater than zero." });
+        }
+
+        if (request.PricePerUnit < 0)
+        {
+            return BadRequest(new { Error = "PricePerUnit cannot be negative." });
+        }
+
+        var validTypes = new[] { "BUY", "SELL", "DEPOSIT", "WITHDRAW" };
+        if (!validTypes.Contains(request.Type.ToUpperInvariant()))
+        {
+            return BadRequest(new
+            {
+                Error = $"Type must be one of: {string.Join(", ", validTypes)}"
+            });
+        }
+
         var portfolioExists = await _db.ExecuteScalarAsync<bool>(
             "SELECT EXISTS(SELECT 1 FROM portfolios WHERE id = @Id)",
             new { Id = portfolioId });
 
         if (!portfolioExists)
         {
-            return NotFound(new { Error = $"Portfolio with ID {portfolioId} not found." });
+            return NotFound(new { Error = $"Portfolio {portfolioId} not found." });
         }
 
-        if (string.IsNullOrWhiteSpace(request.Symbol))
-        {
-            return BadRequest(new { Error = "Symbol is required." });
-        }
 
-        if (request.Quantity <= 0)
-        {
-            return BadRequest(new { Error = "Quantity must be greater than zero." });
-        }
+        // -- JIT: ensure ticker has (or is getting) price data before the FK insert below --
+        var ingestionStatus = await _ingestionService.EnsureTickerReadyAsync(ticker, ct);
 
-        if (request.Price < 0)
-        {
-            return BadRequest(new { Error = "Price cannot be negative." });
-        }
 
-        var validTypes = new[] { "BUY", "SELL", "DEPOSIT", "WITHDRAW" };
-        if (!validTypes.Contains(request.TransactionType.ToUpper()))
-        {
-            return BadRequest(new
-            {
-                Error = $"Invalid transaction type. Must be one of: {string.Join(", ", validTypes)}"
-            });
-        }
+        // -- Insert transaction regardless of ingestion status.
+        // The etf_metadata placeholder row is already committed by EnsureTickerReadyAsync
+        // so the FK constraint is satisfied --
 
-        var query = @"
-            INSERT INTO transactions (
-                portfolio_id, symbol, transaction_type, quantity,
-                price_per_unit, fees, transaction_currency, transaction_date, notes
-            )
-            VALUES (
-                @PortfolioId, @Symbol, @TransactionType::transaction_type, @Quantity,
-                @PricePerUnit, @Fees, @Currency, @TransactionDate, @Notes
-            )
-            RETURNING id, portfolio_id, symbol, transaction_type, quantity,
-                      price_per_unit, fees, transaction_currency, transaction_date, notes";
+        var transactionDate = request.TransactionDate?.Date ?? DateTime.UtcNow.Date;
 
-        var transaction = await _db.QueryFirstAsync(query, new
+
+        var transaction = await _db.QueryFirstAsync("""
+        INSERT INTO transactions
+            (portfolio_id, ticker, type, units, price_per_unit, fees, transaction_date)
+        VALUES
+            (@PortfolioId, @Ticker, @Type, @Units, @PricePerUnit, @Fees, @TransactionDate)
+        RETURNING id, portfolio_id, ticker, type, units, price_per_unit, fees, transaction_date
+        """,
+        new
         {
             PortfolioId = portfolioId,
-            Symbol = request.Symbol,
-            TransactionType = request.TransactionType.ToUpper(),
-            Quantity = request.Quantity,
-            PricePerUnit = request.Price,
-            Fees = 0m,
-            Currency = request.Currency ?? "USD",
-            TransactionDate = request.TransactionDate,
-            Notes = request.Notes
+            Ticker = ticker,
+            Type = request.Type.ToUpperInvariant(),
+            Units = request.Units,
+            PricePerUnit = request.PricePerUnit,
+            Fees = request.Fees,
+            TransactionDate = transactionDate,
         });
 
-        return CreatedAtAction(
-            nameof(GetTransactions),
-            new { portfolioId },
-            transaction);
+        return ingestionStatus == IngestionStatus.Ready
+         ? CreatedAtAction(nameof(GetById), new { id = portfolioId }, new
+         {
+             transaction,
+             ingestion = new { status = "ready" },
+             message = $"Transaction added with ticker {ticker}. Price data already available."
+         })
+         : Accepted(new
+         {
+             transaction,
+             ingestion = new
+             {
+                 status = ingestionStatus.ToString().ToLower(),   // "ingesting" or "error"
+                 ticker,
+                 message = ingestionStatus == IngestionStatus.Ingesting
+                       ? $"Fetching price history for {ticker}. Analytics will be available shortly."
+                       : $"Failed to start price ingestion for {ticker}. Transaction saved; retry ingestion later."
+             }
+         });
     }
+
 
     [HttpGet("{id}/analytics/valuation/history")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -276,13 +307,13 @@ public class PortfoliosController : ControllerBase
     );
 
     public record TransactionCreateRequest(
-        string Symbol,
-        string TransactionType,
-        decimal Quantity,
-        decimal Price,
-        string? Currency,
-        DateTime TransactionDate,
-        string? Notes
+        string Ticker,
+        string Type,
+        decimal Units,
+        decimal PricePerUnit,
+        decimal? Fees = 0,
+        string? Currency = "EUR",
+        DateTime? TransactionDate = null
     );
 
     public record ErrorResponse(string Error);

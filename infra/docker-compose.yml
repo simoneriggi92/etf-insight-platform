@@ -16,7 +16,7 @@ x-airflow-common: &airflow-common
     # .NET API webhook — mirrors DATA_QUALITY_WEBHOOK_URL in load_to_db.py
     DATA_QUALITY_WEBHOOK_URL: http://etf-api:8080/api/data-quality/scan
     DOTNET_API_CALLBACK_URL: http://etf-api:8080/api/ingestion/callback
-    AIRFLOW_CALLBACK_SECRET: dev-callback-secret-changeme #used in phase 3
+    AIRFLOW_CALLBACK_SECRET: ${CALLBACK_SECRET:-dev-callback-secret-changeme}
     # Backfill date range — mirrors BACKFILL_FROM/BACKFILL_TO in .env
     BACKFILL_FROM: ${BACKFILL_FROM:-2024-01-01}
     BACKFILL_TO: ${BACKFILL_TO:-2026-02-28}
@@ -94,10 +94,10 @@ services:
       - DataQuality__FlashCrashThresholdPercent=20.0
       - DataQuality__EnableAutoScan=true
       - DataQuality__ScanIntervalMinutes=5
-      - Airflow__BaseUrl=http://etf-airflow-webserver:8080
-      - Airflow__Username=${AIRFLOW_USERNAME:-admin}
-      - Airflow__Password=${AIRFLOW_PASSWORD:-admin}
-      - Airflow__CallbackSecret=${AIRFLOW_CALLBACK_SECRET:-dev-callback-secret-changeme}
+      - Airflow__BaseUrl=${AIRFLOW_API_URL:-http://etf-airflow-webserver:8080}
+      - Airflow__Username=${AIRFLOW_USER:-admin}
+      - Airflow__Password=${AIRFLOW_PASS:-admin}
+      - Airflow__CallbackSecret=${CALLBACK_SECRET:-dev-callback-secret-changeme}
     depends_on:
       postgres:
         condition: service_healthy
@@ -156,8 +156,8 @@ services:
       - |
         airflow db migrate &&
         airflow users create \
-          --username admin \
-          --password admin \
+          --username ${AIRFLOW_USER:-admin} \
+          --password ${AIRFLOW_PASS:-admin} \
           --firstname Admin \
           --lastname User \
           --role Admin \

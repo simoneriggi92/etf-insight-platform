@@ -214,8 +214,8 @@
       the Airflow callback URL
 - [ ] **X.2** Add `AIRFLOW_API_URL`, `AIRFLOW_USER`, `AIRFLOW_PASS`, `CALLBACK_SECRET` env vars to
       `infra/docker-compose.yml` with safe development defaults
-- [ ] **X.3** Update `src/db/schema.md` to document the new `status` column and RLS policies
-- [ ] **X.4** Add E2E smoke test: create portfolio → add unknown ticker transaction → poll until
+- [x] **X.3** Update `src/db/schema.md` to document the new `status` column and RLS policies
+- [x] **X.4** Add E2E smoke test: create portfolio → add unknown ticker transaction → poll until
       `ready` → verify TWRR is non-null
 
 ---

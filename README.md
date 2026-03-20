@@ -183,13 +183,13 @@ When a user submits a transaction for an unknown ticker, the API:
 
 |            Dashboard            |          Portfolio Management           |
 | :-----------------------------: | :-------------------------------------: |
-|  ![Dashboard](./images/1.png)   | ![Portfolio Management](./images/2.png) |
-| **Transactions & Performance**  |          **AI Advisor (RAG)**           |
-| ![Transactions](./images/3.png) |      ![AI Advisor](./images/4.png)      |
+|  ![Dashboard](./docs/images/1.png)   | ![Portfolio Management](./docs/images/2.png) |
+| **Transactions & Performance** |          **AI Advisor (RAG)** |
+| ![Transactions](./docs/images/3.png) |      ![AI Advisor](./docs/images/4.png)      |
 
 ### Data Quality Dashboard
 
-![Data Quality Dashboard](./images/5.png)
+![Data Quality](./docs/images/5.png)
 
 ---
 

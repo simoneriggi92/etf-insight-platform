@@ -127,5 +127,19 @@ namespace EtfInsight.Infrastructure.Repositories
                 TransactionDate = t.TransactionDate.ToDateTime(TimeOnly.MinValue), // Dapper doesn't support DateOnly natively
             }));
         }
+
+        public async Task<Portfolio?> GetByIdAndUserAsync(Guid portfolioId, Guid userId, CancellationToken ct = default)
+        {
+            await SetTenantContextAsync(userId);
+
+            return await _db.QueryFirstOrDefaultAsync<Portfolio>(
+                    """
+                SELECT id, name, currency, created_at AS CreatedAt
+                FROM portfolios
+                WHERE id = @PortfolioId
+                AND user_id = @UserId
+                """,
+                    new { PortfolioId = portfolioId, UserId = userId });
+        }
     }
 }

@@ -100,6 +100,8 @@ builder.Services.AddScoped<EtfInsight.DataQuality.Interfaces.IEtfPriceRepository
 builder.Services.AddScoped<DataQualityScanner>();
 builder.Services.AddScoped<EtfInsight.Core.Interfaces.IIngestionService, AirflowIngestionService>();
 builder.Services.AddScoped<EtfInsight.Core.Interfaces.ICsvImportService, CsvImportService>();
+builder.Services.AddScoped<IBrokerImportRepository, DapperBrokerImportRepository>();
+builder.Services.AddScoped<IBrokerPdfImportService, BrokerPdfImportService>();
 
 var app = builder.Build();
 

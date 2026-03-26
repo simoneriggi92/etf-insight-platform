@@ -968,21 +968,21 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ### Phase 0 — Discovery
 
-- [ ] Collect and sanitize a representative Trade Republic PDF fixture set
-- [ ] Confirm which stable identifiers exist in the PDF text
-- [ ] Confirm locale and formatting variants
-- [ ] Freeze the V1 support matrix
+- [x] Collect and sanitize a representative Trade Republic PDF fixture set
+- [x] Confirm which stable identifiers exist in the PDF text
+- [x] Confirm locale and formatting variants
+- [x] Freeze the V1 support matrix
 
 ### Phase 1 — Database
 
-- [ ] Create `09_broker_pdf_import.sql`
-- [ ] Add `broker_import_jobs`
-- [ ] Add `broker_import_job_items`
-- [ ] Add partial unique index on `etf_metadata.isin`
-- [ ] Widen `etf_metadata` name and ticker columns if needed
-- [ ] Add transaction provenance and trade-currency columns
-- [ ] Increase `transactions` numeric precision for broker fractional units
-- [ ] Add duplicate-prevention indexes
+- [x] Create `09_broker_pdf_import.sql`
+- [x] Add `broker_import_jobs`
+- [x] Add `broker_import_job_items`
+- [x] Add partial unique index on `etf_metadata.isin`
+- [x] Widen `etf_metadata` name and ticker columns if needed
+- [x] Add transaction provenance and trade-currency columns
+- [x] Increase `transactions` numeric precision for broker fractional units
+- [x] Add duplicate-prevention indexes
 
 ### Phase 2 — Backend API and orchestration
 

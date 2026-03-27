@@ -74,44 +74,94 @@ namespace EtfInsight.Infrastructure.Services
                     CreatedAt = DateTimeOffset.UtcNow,
                     UpdatedAt = DateTimeOffset.UtcNow
                 });
-
-                var job = new BrokerImportJob
-                {
-                    Id = jobId,
-                    PortfolioId = portfolioId,
-                    UserId = userId,
-                    Broker = "trade_republic", // for now we only support Trade Republic, but this can be extended in the future with some PDF content-based detection
-                    Status = "queued",
-                    TotalFiles = files.Count,
-                    CreatedAt = DateTimeOffset.UtcNow,
-                };
-
-                await brokerImportRepository.CreateJobAsync(
-                    job,
-                    jobItems,
-                    ct
-                );
-
-                // Enqueue background processing (e.g. with Hangfire, or just trigger it directly here)
-                var hangfireJob = BackgroundJob.Enqueue<IBrokerPdfImportService>(
-                    service => service.ProcessTradeRepublicImportAsync(jobId, userId, CancellationToken.None));
-
-                logger.LogInformation("Broker PDF import job {JobId} enqueued (Hangfire {HangfireId})", jobId, hangfireJob);
-
-                return new StartBrokerImportResponse(
-                    jobId,
-                    "queued",
-                    files.Count,
-                    $"{files.Count} file(s) queued for processing."
-                );
             }
+
+            var job = new BrokerImportJob
+            {
+                Id = jobId,
+                PortfolioId = portfolioId,
+                UserId = userId,
+                Broker = "trade_republic", // for now we only support Trade Republic, but this can be extended in the future with some PDF content-based detection
+                Status = "queued",
+                TotalFiles = files.Count,
+                CreatedAt = DateTimeOffset.UtcNow,
+            };
+
+            await brokerImportRepository.CreateJobAsync(
+                job,
+                jobItems,
+                ct
+            );
+
+            // Enqueue background processing (e.g. with Hangfire, or just trigger it directly here)
+            var hangfireJob = BackgroundJob.Enqueue<IBrokerPdfImportService>(
+                service => service.ProcessTradeRepublicImportAsync(jobId, userId, CancellationToken.None));
+
+            logger.LogInformation("Broker PDF import job {JobId} enqueued (Hangfire {HangfireId})", jobId, hangfireJob);
+
+            return new StartBrokerImportResponse(
+                jobId,
+                "queued",
+                files.Count,
+                $"{files.Count} file(s) queued for processing."
+            );
         }
 
-        public Task<ImportJobStatusResponse> GetJobStatusAsync(Guid jobId, Guid userId, CancellationToken ct = default)
+        /// <summary>
+        /// Get status of an import job - called by HTTP request, polled by frontend
+        /// </summary>
+        /// <param name="jobId"></param>
+        /// <param name="userId"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        public async Task<ImportJobStatusResponse> GetJobStatusAsync(Guid jobId, Guid userId, CancellationToken ct = default)
         {
-            throw new NotImplementedException();
+            var job = await brokerImportRepository.GetJobAsync(jobId, userId, ct);
+            if (job is null)
+            {
+                return null;
+            }
+
+            var items = await brokerImportRepository.GetItemsAsync(jobId, ct);
+            var tickerStatuses = await brokerImportRepository.GetTickerStatusesForJobAsync(jobId, ct);
+
+            var recentItems = items
+                .OrderByDescending(i => i.UpdatedAt)
+                .Take(10)
+                .Select(i => new ImportJobItemResult(
+                    i.OriginalFileName,
+                    i.Status,
+                    i.Isin,
+                    i.ResolvedTicker,
+                    i.ErrorMessage))
+                .ToList();
+
+            return new ImportJobStatusResponse(
+                job.Id,
+                job.Status,
+                job.TotalFiles,
+                job.ProcessedFiles,
+                job.ImportedFiles,
+                job.DuplicateFiles,
+                job.FailedFiles,
+                job.WaitingForIngestionFiles,
+                job.CurrentFileName,
+                job.CurrentMessage,
+                job.ErrorSummary,
+                job.CreatedAt,
+                job.StartedAt,
+                job.CompletedAt,
+                recentItems,
+                tickerStatuses);
         }
 
+        /// <summary>
+        /// Hangfire background job to process the imported PDF files - one job per import
+        /// </summary>
+        /// <param name="importJobId"></param>
+        /// <param name="userId"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
         [AutomaticRetry(Attempts = 0)] // no retry: state is in DB, retry would double-process
         public async Task ProcessTradeRepublicImportAsync(Guid importJobId, Guid userId, CancellationToken ct = default)
         {

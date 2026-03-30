@@ -570,101 +570,327 @@ This endpoint becomes the single source of truth for the browser progress bar.
 
 ## 9. Phase 3 — PDF extraction and Trade Republic parsing
 
-### 9.1 Package choice
+### 9.1 Package
 
-Add `UglyToad.PdfPig` to `EtfInsight.Infrastructure`.
+Add `PdfPig` (NuGet id: `UglyToad.PdfPig`) to `EtfInsight.Infrastructure.csproj`.
 
-Reason:
+No other third-party PDF parser needed for V1. PdfPig is pure managed code with no native dependencies, which keeps the Docker image simple.
 
-- parsing belongs in the infrastructure layer
-- the repository already keeps CSV import and Airflow integration in Infrastructure
+### 9.2 File and namespace structure
 
-### 9.2 Suggested parser structure
+New files:
 
-Recommended components:
+```
+src/EtfInsight.Core/Interfaces/
+  IPdfTextExtractor.cs
+  ITradeRepublicParser.cs
 
-- `TradeRepublicPdfTextExtractor`
-- `TradeRepublicTextNormalizer`
-- `TradeRepublicParser`
-- `TradeRepublicDocumentKindDetector`
+src/EtfInsight.Core/DTOs/
+  ParsedTransactionResult.cs        ← parsed output model
+  TradeRepublicParseResult.cs       ← discriminated union
 
-The detector should inspect both:
+src/EtfInsight.Infrastructure/Services/BrokerPdf/
+  PdfPigTextExtractor.cs
+  TradeRepublicTextNormalizer.cs
+  TradeRepublicDocumentKindDetector.cs
+  TradeRepublicParser.cs
 
-- PDF metadata such as title
-- normalized visible text
+tests/EtfInsight.Tests/BrokerPdf/
+  Fixtures/
+    savings_plan_execution_REDACTED.pdf
+    buy_confirmation_REDACTED.pdf
+    sell_confirmation_REDACTED.pdf
+    unsupported_dividend_REDACTED.pdf
+    empty.pdf
+  TradeRepublicTextNormalizerTests.cs
+  TradeRepublicDocumentKindDetectorTests.cs
+  TradeRepublicParserTests.cs
+```
 
-because the provided sample uses English metadata and Italian body text.
+Namespace convention:
 
-### 9.3 Parsing pipeline
+- implementation types → `EtfInsight.Infrastructure.Services.BrokerPdf`
+- interface and model types → `EtfInsight.Core.Interfaces` / `EtfInsight.Core.DTOs`
 
-Per file:
+### 9.3 Interface contracts
 
-1. compute SHA-256 hash from the raw bytes
-2. check whether this file is already known for the portfolio
-3. extract plain text from the PDF
-4. normalize whitespace, line endings, decimal separators, and date formats
-5. detect the document kind using both metadata and body keywords
-6. apply the matching regex set
-7. map to a typed parsed transaction result
+#### `IPdfTextExtractor`
 
-### 9.4 Parsing output model
+Lives in `EtfInsight.Core/Interfaces/IPdfTextExtractor.cs`.
 
-Recommended parsed fields:
+Single method:
 
-- broker reference
-- broker secondary reference
-- instrument name
-- ISIN
-- transaction type
-- transaction date
-- settlement date if present
-- units
-- price per unit
-- fees
-- total amount if present
-- currency
+```csharp
+Task<PdfExtractionResult> ExtractAsync(string filePath, CancellationToken ct = default);
+```
 
-### 9.5 Keep regex rules explicit and document-kind specific
+`PdfExtractionResult` is a record defined in the same file:
 
-Do not use one large regex for every Trade Republic document.
+| Property  | Type      | Notes                                          |
+| --------- | --------- | ---------------------------------------------- |
+| `Title`   | `string?` | Value of the PDF `/Title` metadata field       |
+| `RawText` | `string`  | Full concatenated text from all pages in order |
 
-Prefer:
+#### `ITradeRepublicParser`
 
-- one detector per document kind
-- one extraction rule set per supported kind
-- one error message per failure mode
+Lives in `EtfInsight.Core/Interfaces/ITradeRepublicParser.cs`.
 
-This will make parser maintenance much easier when the broker changes layout wording.
+Single method:
 
-For the provided sample, the relevant anchors are closer to:
+```csharp
+TradeRepublicParseResult Parse(PdfExtractionResult extraction);
+```
 
-- `ESECUZIONE`
-- `PIANO DI ACCUMULO`
-- `ISIN:`
-- `QUANTITÀ`
-- `PREZZO MEDIO`
-- `TOTALE`
-- `DATA VALUTA`
+No async: parsing is pure CPU work on already-extracted text. The interface is thin; the implementation (`TradeRepublicParser`) owns the normalizer, detector, and regex logic internally.
 
-than to fixed line numbers.
+### 9.4 `ParsedTransactionResult` model
 
-### 9.6 Unsupported documents
+Lives in `src/EtfInsight.Core/DTOs/ParsedTransactionResult.cs`.
 
-If a file is a valid Trade Republic PDF but not a supported transaction type:
+| Property                   | C# type     | Source field in document   | Notes                                 |
+| -------------------------- | ----------- | -------------------------- | ------------------------------------- |
+| `BrokerReference`          | `string?`   | `ESECUZIONE …`             | Primary idempotency key               |
+| `BrokerSecondaryReference` | `string?`   | `PIANO DI ACCUMULO …`      | Provenance only                       |
+| `InstrumentName`           | `string?`   | Line above `ISIN:`         | May be null if extraction fails       |
+| `Isin`                     | `string`    | `ISIN:` label              | Required; 12-char validated           |
+| `TransactionType`          | `string`    | Derived from document kind | `"BUY"` or `"SELL"`                   |
+| `TransactionDate`          | `DateOnly`  | Execution date field       | Not the value/settlement date         |
+| `SettlementDate`           | `DateOnly?` | `DATA VALUTA`              | Provenance only                       |
+| `Units`                    | `decimal`   | `QUANTITÀ`                 | 6 decimal places from sample          |
+| `PricePerUnit`             | `decimal`   | `PREZZO MEDIO`             | 4 decimal places from sample          |
+| `Fees`                     | `decimal?`  | Optional fee line          | null if absent                        |
+| `GrossAmount`              | `decimal`   | `TOTALE`                   | Cross-check; not persisted separately |
+| `Currency`                 | `string`    | Code adjacent to amounts   | 3-char ISO                            |
 
-- mark the item as `unsupported`
-- record a clear reason
-- continue the batch
+### 9.5 `TradeRepublicParseResult` discriminated union
 
-### 9.7 Parsing failure diagnostics
+Lives in `src/EtfInsight.Core/DTOs/TradeRepublicParseResult.cs`.
 
-Record enough detail to support debugging without storing the full raw PDF text forever.
+Three concrete subtypes:
 
-Recommended stored diagnostics:
+| Case          | Condition                                    | Carrier fields                        |
+| ------------- | -------------------------------------------- | ------------------------------------- |
+| `Success`     | All required fields extracted                | `ParsedTransactionResult Transaction` |
+| `Unsupported` | Valid TR PDF, document kind outside V1 scope | `string Reason`                       |
+| `Failure`     | Parse error or missing required field        | `string Reason`, `string Stage`       |
 
-- high-level failure reason
-- maybe a short normalized excerpt or parser stage marker
-- original file name
+`Stage` examples: `"extraction"`, `"detection"`, `"isin"`, `"units"`, `"transaction_date"`.
+
+This union is the only return type of `ITradeRepublicParser.Parse`. The caller switches on the subtype instead of catching exceptions for expected outcomes.
+
+### 9.6 Document kind
+
+```csharp
+enum TradeRepublicDocumentKind
+{
+    Unknown,
+    BuyConfirmation,
+    SellConfirmation,
+    SavingsPlanExecution,
+    Dividend,       // unsupported in V1
+    Tax,            // unsupported in V1
+    CashMovement    // unsupported in V1
+}
+```
+
+V1 only processes `BuyConfirmation`, `SellConfirmation`, and `SavingsPlanExecution`. All others produce an `Unsupported` result.
+
+### 9.7 Detection strategy
+
+`TradeRepublicDocumentKindDetector.Detect(string? pdfTitle, string normalizedBody)` applies checks in order:
+
+**Step 1 — PDF title (case-insensitive):**
+
+| Title contains             | Body also contains | Result                 |
+| -------------------------- | ------------------ | ---------------------- |
+| `"savings plan execution"` | —                  | `SavingsPlanExecution` |
+| `"order confirmation"`     | `"ACQUISTO"`       | `BuyConfirmation`      |
+| `"order confirmation"`     | `"VENDITA"`        | `SellConfirmation`     |
+| `"dividend"`               | —                  | `Dividend`             |
+
+**Step 2 — Body keyword fallback (if title is null or unrecognized):**
+
+| Body contains         | Result                 |
+| --------------------- | ---------------------- |
+| `"PIANO DI ACCUMULO"` | `SavingsPlanExecution` |
+| `"ACQUISTO"`          | `BuyConfirmation`      |
+| `"VENDITA"`           | `SellConfirmation`     |
+| `"DIVIDENDO"`         | `Dividend`             |
+
+**Step 3:** If still unresolved → `Unknown`.
+
+Both sources are checked because the confirmed sample has an English PDF title and an Italian body.
+
+### 9.8 Text normalization rules
+
+`TradeRepublicTextNormalizer.Normalize(string rawText)` applies in order:
+
+1. Replace `\r\n` and `\r` with `\n`
+2. Replace zero-width and non-breaking spaces (`\u200B`, `\u00A0`, `\uFEFF`) with regular space
+3. Collapse runs of whitespace-only characters within a line to a single space
+4. Trim leading and trailing whitespace per line
+5. Collapse more than two consecutive blank lines to a single blank line
+
+Do **not** convert decimal commas globally and do **not** convert date strings globally at this stage. These conversions happen field-by-field inside the parser to avoid misidentifying thousands separators.
+
+### 9.9 Regex anchors per document kind
+
+All patterns use `Regex.Match` on the full normalized text. Options: `RegexOptions.IgnoreCase | RegexOptions.Multiline`.
+
+#### Common to `BuyConfirmation`, `SellConfirmation`, `SavingsPlanExecution`:
+
+> Patterns verified against `test.pdf` (savings plan execution, Italian locale, 2026-03-02).
+
+| Field            | Pattern                                  | Status                                                                           |
+| ---------------- | ---------------------------------------- | -------------------------------------------------------------------------------- |
+| ISIN             | `ISIN:\s*([A-Z]{2}[A-Z0-9]{9}\d)`        | ✓ verified                                                                       |
+| Execution ref    | `ESECUZIONE\s+([A-Za-z0-9\-]+)`          | ✓ verified                                                                       |
+| Plan ref         | `PIANO DI ACCUMULO\s+([A-Za-z0-9\-]+)`   | ✓ verified; savings plan docs only                                               |
+| Gross amount     | `TOTALE\s+([\d,]+)\s+([A-Z]{3})`         | ✓ verified                                                                       |
+| Transaction date | `\bDATA\s+(\d{2}\.\d{2}\.\d{4})`         | ✓ verified; label is `DATA`, **not** `DATA DI ESECUZIONE` or `DATA OPERAZIONE`   |
+| Settlement date  | `DATA VALUTA[\s\S]*?(\d{4}-\d{2}-\d{2})` | ✓ verified; format is ISO `YYYY-MM-DD` across a line break, **not** `DD.MM.YYYY` |
+
+Notes:
+
+- `\bDATA\s+(\d{2}\.\d{2}\.\d{4})` does **not** accidentally match `DATA VALUTA` because `VALUTA` is not `\d{2}\.\d{2}\.\d{4}`.
+- The settlement date regex uses `[\s\S]*?` (non-greedy, matches the newline between the `DATA VALUTA IMPORTO` header and the IBAN data line).
+
+#### Instrument data row — units, price per unit, and instrument name
+
+`QUANTITÀ` and `PREZZO MEDIO` are **column headers** in the document, not field labels. Their values appear on the instrument data row that immediately follows the header line `POSIZIONE QUANTITÀ PREZZO MEDIO IMPORTO`. Extract all three fields together with one right-anchored pattern (options: `IgnoreCase | Multiline`):
+
+```
+POSIZIONE QUANTIT[AÀ] PREZZO MEDIO IMPORTO\n(.+?)\s+([\d]+,[\d]+)\s+([\d]+,[\d]+)\s+EUR\s+([\d]+,[\d]+)\s+EUR
+```
+
+Capture groups:
+
+| Group | Field                                  | Verified example            |
+| ----- | -------------------------------------- | --------------------------- |
+| 1     | Instrument name                        | `Core MSCI World USD (Acc)` |
+| 2     | Units                                  | `7,378349`                  |
+| 3     | Price per unit                         | `113,8466`                  |
+| 4     | Gross amount (cross-check vs `TOTALE`) | `840,00`                    |
+
+Currency is taken from the fixed `EUR` literals on the same data line; fall back to the `TOTALE` line if absent.
+
+This replaces the backwards-scan instrument-name approach. The table-row pattern returns the name cleanly as group 1 because all numeric fields are right-anchored at the end of the line.
+
+### 9.10 Field parsing rules
+
+**Decimal fields** (units, price, gross amount, fees):
+
+```
+step 1: remove all '.' characters (Trade Republic uses '.' as a thousands separator in some locales)
+step 2: replace ',' with '.'
+step 3: decimal.Parse(result, CultureInfo.InvariantCulture)
+```
+
+**Date fields:**
+
+- Transaction date: `DateOnly.ParseExact(captured, "dd.MM.yyyy", CultureInfo.InvariantCulture)` — confirmed format from `DATA 02.03.2026`
+- Settlement date: `DateOnly.ParseExact(captured, "yyyy-MM-dd", CultureInfo.InvariantCulture)` — confirmed ISO format from `2026-03-04` on the CONTO DI TRANSITO line
+
+Do **not** use a single format for both fields; they differ in this document.
+
+**ISIN validation** (after regex capture):
+
+- exact length 12
+- characters 0–1: `[A-Z]{2}`
+- characters 2–11: `[A-Z0-9]{10}`
+- Luhn mod-10 checksum is optional for V1 but recommended as an assertion in the parser unit tests
+
+### 9.11 Duplicate detection — new repository method
+
+Add to `IBrokerImportRepository`:
+
+```csharp
+Task<bool> IsDocumentAlreadyImportedAsync(
+    Guid portfolioId,
+    string fileSha256,
+    string? brokerReference,
+    CancellationToken ct = default);
+```
+
+`DapperBrokerImportRepository` implements this with a query against `transactions` (not `broker_import_job_items`), so a document that was imported in a previous job is still detected:
+
+```sql
+SELECT EXISTS (
+    SELECT 1 FROM transactions
+    WHERE portfolio_id = @PortfolioId
+    AND (
+        source_document_hash = @FileSha256
+        OR (
+            source_broker = 'trade_republic'
+            AND source_reference = @BrokerReference
+            AND @BrokerReference IS NOT NULL
+        )
+    )
+)
+```
+
+Hash is checked first. Broker reference serves as a secondary match since the same execution id can only exist once per portfolio.
+
+This call occurs after a successful parse, before any transaction insert, while the item is still at `parsed` status.
+
+### 9.12 Integration into `ProcessTradeRepublicImportAsync`
+
+The `TODO Phase 3` stub in `BrokerPdfImportService.ProcessTradeRepublicImportAsync` expands into the following per-item sequence. Phase 4 (instrument resolution and insert) begins at step 10 and is **not** part of Phase 3:
+
+```
+ 1. UpdateItemStatus(item.Id, "parsing")
+ 2. result ← extractor.ExtractAsync(item.TempFilePath, ct)
+ 3. normalized ← normalizer.Normalize(result.RawText)
+ 4. kind ← detector.Detect(result.Title, normalized)
+ 5. if kind ∉ {BuyConfirmation, SellConfirmation, SavingsPlanExecution}:
+       → UpdateItem(status="unsupported", errorMessage="Document kind not supported in V1: {kind}")
+       → continue to next item
+ 6. parseResult ← parser.Parse(result)
+ 7. if parseResult is Failure:
+       → UpdateItem(status="failed", errorMessage="{Stage}: {Reason}")
+       → continue
+ 8. if parseResult is Unsupported:
+       → UpdateItem(status="unsupported", errorMessage=parseResult.Reason)
+       → continue
+ 9. isDuplicate ← IsDocumentAlreadyImportedAsync(item.PortfolioId, item.FileSha256, parsed.BrokerReference, ct)
+10. if isDuplicate:
+       → UpdateItem(status="duplicate")
+       → continue
+11. UpdateItem with all parsed fields, status="parsed"
+    (Phase 4 picks up from here)
+```
+
+The `TODO Phase 4` comment replacing the old `TODO Phase 3` comment makes the handoff boundary explicit.
+
+### 9.13 Unsupported and failed item handling
+
+- `unsupported` items: valid TR PDF, kind not in V1 scope. Counted separately in job counters.
+- `failed` items: extraction error, parse error, or missing required field.
+- Neither stops the batch; both are terminal per-item states.
+- `failed_files` counter in `broker_import_jobs` counts only `failed` items. `unsupported` items will not be counted in `failed_files`; they will be surfaced in a future `unsupported_files` counter if needed (out of scope for Phase 3).
+
+### 9.14 Diagnostics stored per failed item
+
+`error_message` is capped at 500 chars. Include:
+
+- stage name (`"isin"`, `"units"`, `"transaction_date"`, etc.)
+- reason (`"ISIN not found in text"`, `"Units decimal parse failed: '7,378,349'"`)
+
+Do not store the full raw PDF text or the full normalized text in the DB row.
+
+### 9.15 Test project adjustment
+
+`tests/EtfInsight.Tests/EtfInsight.Tests.csproj` currently references only `EtfInsight.Core`.
+
+Add a `<ProjectReference>` to `EtfInsight.Infrastructure` to allow testing `BrokerPdf` classes directly.
+
+PDF fixtures in `tests/EtfInsight.Tests/BrokerPdf/Fixtures/` should be declared as:
+
+```xml
+<Content Include="BrokerPdf/Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
+```
+
+so tests run correctly after `dotnet test` without manual file copying.
 
 ## 10. Phase 4 — Instrument resolution and JIT ingestion reuse
 
@@ -986,24 +1212,33 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ### Phase 2 — Backend API and orchestration
 
-- [ ] Add broker import DTOs and interfaces in `EtfInsight.Core`
-- [ ] Add `DapperBrokerImportRepository`
-- [ ] Add `BrokerPdfImportService`
-- [ ] Add `POST /api/portfolios/{id}/import/broker-pdf`
-- [ ] Add `GET /api/import-jobs/{jobId}`
-- [ ] Enqueue import processing through Hangfire
-- [ ] Enforce guest ownership checks on both endpoints
+- [x] Add broker import DTOs and interfaces in `EtfInsight.Core`
+- [x] Add `DapperBrokerImportRepository`
+- [x] Add `BrokerPdfImportService`
+- [x] Add `POST /api/portfolios/{id}/import/broker-pdf`
+- [x] Add `GET /api/import-jobs/{jobId}`
+- [x] Enqueue import processing through Hangfire
+- [x] Enforce guest ownership checks on both endpoints
 
 ### Phase 3 — PDF parsing
 
-- [ ] Add `UglyToad.PdfPig` to `EtfInsight.Infrastructure`
-- [ ] Add PDF text extractor
-- [ ] Add text normalizer
-- [ ] Add Trade Republic document-kind detection
-- [ ] Add parser rules for buy, sell, and savings plan execution
-- [ ] Detect execution id and recurring plan id separately
-- [ ] Parse execution date and value date separately
-- [ ] Add duplicate detection by file hash and broker reference
+- [x] Add `UglyToad.PdfPig` NuGet to `EtfInsight.Infrastructure.csproj`
+- [x] Add `IPdfTextExtractor` interface and `PdfExtractionResult` record to `EtfInsight.Core`
+- [x] Implement `PdfPigTextExtractor` in `EtfInsight.Infrastructure/Services/BrokerPdf/`
+- [ ] Add `ITradeRepublicParser` interface to `EtfInsight.Core`
+- [ ] Add `ParsedTransactionResult` DTO to `EtfInsight.Core/DTOs/`
+- [ ] Add `TradeRepublicParseResult` discriminated union (`Success`, `Unsupported`, `Failure`) to `EtfInsight.Core/DTOs/`
+- [ ] Implement `TradeRepublicTextNormalizer` (whitespace, CRLF, zero-width chars)
+- [ ] Implement `TradeRepublicDocumentKindDetector` (PDF title + Italian body keywords)
+- [ ] Implement `TradeRepublicParser` with regex rule sets for `BuyConfirmation`, `SellConfirmation`, `SavingsPlanExecution`
+- [ ] Implement instrument name extraction (backwards-scan from `ISIN:` line)
+- [ ] Implement per-field decimal parsing (strip thousands `.`, convert `,` to `.`)
+- [ ] Implement per-field date parsing (`dd.MM.yyyy` → `DateOnly`)
+- [ ] Add `IsDocumentAlreadyImportedAsync` to `IBrokerImportRepository` and `DapperBrokerImportRepository`
+- [ ] Replace `TODO Phase 3` stub in `ProcessTradeRepublicImportAsync` with full parse-and-duplicate-check loop (steps 1–11 per plan)
+- [ ] Add `<ProjectReference>` to `EtfInsight.Infrastructure` in the test project
+- [ ] Add PDF fixtures to `tests/EtfInsight.Tests/BrokerPdf/Fixtures/` with `CopyToOutputDirectory`
+- [ ] Add unit tests: normalizer, detector, parser (all document kinds + failure modes)
 
 ### Phase 4 — Instrument resolution and JIT
 

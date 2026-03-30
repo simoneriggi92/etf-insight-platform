@@ -50,7 +50,7 @@ If the `--chat` flag IS present:
 
 - **CRITICAL:** DO NOT use tools to edit or modify project files directly. Output the code for **ONE** task only directly here in the chat response.
 - Provide clear instructions on where this code belongs (e.g., file paths and line numbers or methods to replace).
-- Provide exaplainations, mermaid diagrams, or any other context necessary to understand the code and its placement.
+- Provide explanations, mermaid diagrams, or any other context necessary to understand the code and its placement.
 - Do not attempt to update `plan.md` using file tools.
 - **STOP** execution and wait for me to review, apply the code manually, and issue my next `/implement --chat` command to proceed to the next task.
 

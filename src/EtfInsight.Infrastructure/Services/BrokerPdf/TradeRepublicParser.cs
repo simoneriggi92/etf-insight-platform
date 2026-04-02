@@ -9,7 +9,7 @@ using System.Globalization;
 
 namespace EtfInsight.Infrastructure.Services.BrokerPdf
 {
-    internal sealed class TradeRepublicParser : ITradeRepublicParser
+    public sealed class TradeRepublicParser : ITradeRepublicParser
     {
         private static readonly Regex IsinPattern =
         new(@"ISIN:\s*([A-Z]{2}[A-Z0-9]{9}\d)",

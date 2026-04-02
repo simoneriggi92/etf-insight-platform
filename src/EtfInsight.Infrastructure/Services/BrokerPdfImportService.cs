@@ -7,16 +7,17 @@ using EtfInsight.Core.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using EtfInsight.Core.Entities;
-using EtfInsight.Core.Interfaces;
-using Microsoft.AspNetCore.Http;
 using Hangfire;
-
+using Microsoft.AspNetCore.Http;
+using EtfInsight.Infrastructure.Services.BrokerPdf;
 
 namespace EtfInsight.Infrastructure.Services
 {
     public class BrokerPdfImportService(
         IBrokerImportRepository brokerImportRepository,
         IPortfolioRepository portfolioRepository,
+        IPdfTextExtractor pdfTextExtractor,
+        ITradeRepublicParser tradeRepublicParser,
         ILogger<BrokerPdfImportService> logger,
         IConfiguration config) : IBrokerPdfImportService
     {
@@ -162,42 +163,145 @@ namespace EtfInsight.Infrastructure.Services
         /// <param name="userId"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        [AutomaticRetry(Attempts = 0)] // no retry: state is in DB, retry would double-process
+        [AutomaticRetry(Attempts = 0)]
         public async Task ProcessTradeRepublicImportAsync(Guid importJobId, Guid userId, CancellationToken ct = default)
         {
             await brokerImportRepository.UpdateJobStatusAsync(importJobId, "processing");
             var items = await brokerImportRepository.GetItemsAsync(importJobId, ct);
 
+            static string Truncate(string s) => s.Length > 500 ? s[..500] : s;
+
             foreach (var item in items)
             {
                 await brokerImportRepository.UpdateJobStatusAsync(importJobId, "processing",
-                item.OriginalFileName,
-                "Processing file...");
+                    item.OriginalFileName, "Processing file...");
 
-                //TODO Phase 3: PDF parsing + instrument resolution
-                var updated = item with
+                // Step 1
+                await brokerImportRepository.UpdateItemAsync(
+                    item with { Status = "parsing", UpdatedAt = DateTimeOffset.UtcNow }, ct);
+
+                // Step 2
+                PdfExtractionResult extraction;
+                try
                 {
-                    Status = "failed",
-                    ErrorMessage = "PDF parsing not implemented yet.",
-                    UpdatedAt = DateTimeOffset.UtcNow
-                };
+                    extraction = await pdfTextExtractor.ExtractTextAsync(item.TempFilePath, ct);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex,
+                        "PDF extraction failed for {FileName} in job {JobId}", item.OriginalFileName, importJobId);
+                    await brokerImportRepository.UpdateItemAsync(
+                        item with
+                        {
+                            Status = "failed",
+                            ErrorMessage = Truncate($"extraction: {ex.Message}"),
+                            UpdatedAt = DateTimeOffset.UtcNow
+                        }, ct);
+                    continue;
+                }
 
-                await brokerImportRepository.UpdateItemAsync(updated, ct);
+                // Steps 3–4
+                var normalized = TradeRepublicTextNormalizer.Normalize(extraction.RawText);
+                var kind = TradeRepublicDocumentKindDetector.Detect(extraction.Title, normalized);
+
+                // Step 5
+                if (kind is not (TradeRepublicDocumentKind.BuyConfirmation
+                    or TradeRepublicDocumentKind.SellConfirmation
+                    or TradeRepublicDocumentKind.SavingsPlanExecution))
+                {
+                    await brokerImportRepository.UpdateItemAsync(
+                        item with
+                        {
+                            Status = "unsupported",
+                            ErrorMessage = Truncate($"Document kind not supported in V1: {kind}"),
+                            UpdatedAt = DateTimeOffset.UtcNow
+                        }, ct);
+                    continue;
+                }
+
+                // Step 6
+                var parseResult = tradeRepublicParser.Parse(extraction);
+
+                // Step 7
+                if (parseResult is TradeRepublicParserResult.Failure failure)
+                {
+                    await brokerImportRepository.UpdateItemAsync(
+                        item with
+                        {
+                            Status = "failed",
+                            ErrorMessage = Truncate($"{failure.Stage}: {failure.Reason}"),
+                            UpdatedAt = DateTimeOffset.UtcNow
+                        }, ct);
+                    continue;
+                }
+
+                // Step 8
+                if (parseResult is TradeRepublicParserResult.Unsupported unsupported)
+                {
+                    await brokerImportRepository.UpdateItemAsync(
+                        item with
+                        {
+                            Status = "unsupported",
+                            ErrorMessage = Truncate(unsupported.Reason),
+                            UpdatedAt = DateTimeOffset.UtcNow
+                        }, ct);
+                    continue;
+                }
+
+                var parsed = ((TradeRepublicParserResult.Success)parseResult).Transaction;
+
+                // Step 9
+                var isDuplicate = await brokerImportRepository.IsDocumentAlreadyImportedAsync(
+                    item.PortfolioId, item.FileSha256, parsed.BrokerReference, ct);
+
+                // Step 10
+                if (isDuplicate)
+                {
+                    await brokerImportRepository.UpdateItemAsync(
+                        item with
+                        {
+                            Status = "duplicate",
+                            Isin = parsed.Isin,
+                            BrokerReference = parsed.BrokerReference,
+                            UpdatedAt = DateTimeOffset.UtcNow
+                        }, ct);
+                    continue;
+                }
+
+                // Step 11 — all parsed fields persisted; Phase 4 instrument resolution picks up here
+                await brokerImportRepository.UpdateItemAsync(
+                    item with
+                    {
+                        Status = "parsed",
+                        BrokerReference = parsed.BrokerReference,
+                        BrokerSecondaryReference = parsed.BrokerSecondaryReference,
+                        Isin = parsed.Isin,
+                        InstrumentName = parsed.InstrumentName,
+                        TransactionType = parsed.TransactionType,
+                        TransactionDate = parsed.TransactionDate,
+                        SettlementDate = parsed.SettlementDate,
+                        Units = parsed.Units,
+                        PricePerUnit = parsed.PricePerUnit,
+                        Fees = parsed.Fees,
+                        GrossAmount = parsed.GrossAmount,
+                        Currency = parsed.Currency,
+                        UpdatedAt = DateTimeOffset.UtcNow
+                    }, ct);
             }
 
-            await brokerImportRepository.UpdateJobCountersAsync(importJobId, ct); // update counters based on item statuses
+            await brokerImportRepository.UpdateJobCountersAsync(importJobId, ct);
 
             var finalItems = await brokerImportRepository.GetItemsAsync(importJobId, ct);
-            var allDone = finalItems.All(i => i.Status is "imported" or "duplicate" or "unsupported" or "failed");
             var anyWaiting = finalItems.Any(i => i.Status == "waiting_for_ingestion");
+            var anyParsedPendingPhase4 = finalItems.Any(i => i.Status == "parsed");
 
             var finalStatus = anyWaiting ? "waiting_for_ingestion"
-            : finalItems.Any(i => i.Status == "failed") ? "completed_with_errors"
-            : "completed";
+                : anyParsedPendingPhase4 || finalItems.Any(i => i.Status == "failed")
+                    ? "completed_with_errors"
+                : "completed";
 
             await brokerImportRepository.MarkJobCompletedAsync(importJobId, finalStatus);
             logger.LogInformation("Import job {JobId} finished with status {Status}", importJobId, finalStatus);
         }
-
     }
 }

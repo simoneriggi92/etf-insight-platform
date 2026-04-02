@@ -88,6 +88,21 @@ namespace EtfInsight.Infrastructure.Repositories
             return rows.ToDictionary(r => r.ticker, r => r.status);
         }
 
+        public Task<bool> IsDocumentAlreadyImportedAsync(Guid portfolioId, string documentHash, string? brokerReference, CancellationToken ct = default)
+        {
+            return db.ExecuteScalarAsync<bool>(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM broker_import_job_items
+                    WHERE portfolio_id = @PortfolioId
+                    AND file_sha256 = @DocumentHash
+                    AND (@BrokerReference IS NULL OR broker_reference = @BrokerReference)
+                )
+                """,
+                new { PortfolioId = portfolioId, DocumentHash = documentHash, BrokerReference = brokerReference });
+        }
+
         public async Task MarkJobCompletedAsync(Guid jobId, string finalStatus, string? errorSummary = null, CancellationToken ct = default)
         {
             await db.ExecuteAsync(

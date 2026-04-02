@@ -9,6 +9,7 @@ using EtfInsight.Core.DTOs;
 using EtfInsight.Core.Services;
 using EtfInsight.Core.Configuration;
 using EtfInsight.Infrastructure.Services;
+using EtfInsight.Infrastructure.Services.BrokerPdf;
 using EtfInsight.DataQuality.Models;
 using EtfInsight.DataQuality.Interfaces;
 using EtfInsight.DataQuality.Rules;
@@ -100,6 +101,8 @@ builder.Services.AddScoped<EtfInsight.DataQuality.Interfaces.IEtfPriceRepository
 builder.Services.AddScoped<DataQualityScanner>();
 builder.Services.AddScoped<EtfInsight.Core.Interfaces.IIngestionService, AirflowIngestionService>();
 builder.Services.AddScoped<EtfInsight.Core.Interfaces.ICsvImportService, CsvImportService>();
+builder.Services.AddScoped<IPdfTextExtractor, PdfPigTextExtractor>();
+builder.Services.AddScoped<ITradeRepublicParser, TradeRepublicParser>();
 builder.Services.AddScoped<IBrokerImportRepository, DapperBrokerImportRepository>();
 builder.Services.AddScoped<IBrokerPdfImportService, BrokerPdfImportService>();
 
@@ -166,4 +169,3 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 
 app.Run();
-

@@ -1225,15 +1225,15 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Add `UglyToad.PdfPig` NuGet to `EtfInsight.Infrastructure.csproj`
 - [x] Add `IPdfTextExtractor` interface and `PdfExtractionResult` record to `EtfInsight.Core`
 - [x] Implement `PdfPigTextExtractor` in `EtfInsight.Infrastructure/Services/BrokerPdf/`
-- [ ] Add `ITradeRepublicParser` interface to `EtfInsight.Core`
-- [ ] Add `ParsedTransactionResult` DTO to `EtfInsight.Core/DTOs/`
-- [ ] Add `TradeRepublicParseResult` discriminated union (`Success`, `Unsupported`, `Failure`) to `EtfInsight.Core/DTOs/`
-- [ ] Implement `TradeRepublicTextNormalizer` (whitespace, CRLF, zero-width chars)
-- [ ] Implement `TradeRepublicDocumentKindDetector` (PDF title + Italian body keywords)
-- [ ] Implement `TradeRepublicParser` with regex rule sets for `BuyConfirmation`, `SellConfirmation`, `SavingsPlanExecution`
-- [ ] Implement instrument name extraction (backwards-scan from `ISIN:` line)
-- [ ] Implement per-field decimal parsing (strip thousands `.`, convert `,` to `.`)
-- [ ] Implement per-field date parsing (`dd.MM.yyyy` → `DateOnly`)
+- [x] Add `ITradeRepublicParser` interface to `EtfInsight.Core`
+- [x] Add `ParsedTransactionResult` DTO to `EtfInsight.Core/DTOs/`
+- [x] Add `TradeRepublicParseResult` discriminated union (`Success`, `Unsupported`, `Failure`) to `EtfInsight.Core/DTOs/`
+- [x] Implement `TradeRepublicTextNormalizer` (whitespace, CRLF, zero-width chars)
+- [x] Implement `TradeRepublicDocumentKindDetector` (PDF title + Italian body keywords)
+- [x] Implement `TradeRepublicParser` with regex rule sets for `BuyConfirmation`, `SellConfirmation`, `SavingsPlanExecution`
+- [x] Implement instrument name extraction (backwards-scan from `ISIN:` line)
+- [x] Implement per-field decimal parsing (strip thousands `.`, convert `,` to `.`)
+- [x] Implement per-field date parsing (`dd.MM.yyyy` → `DateOnly`)
 - [ ] Add `IsDocumentAlreadyImportedAsync` to `IBrokerImportRepository` and `DapperBrokerImportRepository`
 - [ ] Replace `TODO Phase 3` stub in `ProcessTradeRepublicImportAsync` with full parse-and-duplicate-check loop (steps 1–11 per plan)
 - [ ] Add `<ProjectReference>` to `EtfInsight.Infrastructure` in the test project

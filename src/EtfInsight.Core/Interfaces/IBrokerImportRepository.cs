@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using EtfInsight.Core.DTOs;
 using EtfInsight.Core.Entities;
 namespace EtfInsight.Core.Interfaces
 {
@@ -16,5 +17,6 @@ namespace EtfInsight.Core.Interfaces
         Task UpdateItemAsync(BrokerImportJobItem item, CancellationToken ct = default);
         Task<IReadOnlyDictionary<string, string>> GetTickerStatusesForJobAsync(Guid jobId, CancellationToken ct = default);
         Task<bool> IsDocumentAlreadyImportedAsync(Guid portfolioId, string documentHash, string? brokerReference, CancellationToken ct = default);
+        Task<Guid> InsertBrokerTransactionAsync(BrokerTransactionInsertRequest request, CancellationToken ct = default);
     }
 }

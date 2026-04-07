@@ -15,7 +15,7 @@ namespace EtfInsight.Core.Interfaces
             IReadOnlyList<IFormFile> files,
             CancellationToken ct = default);
 
-        Task<ImportJobStatusResponse> GetJobStatusAsync(
+        Task<ImportJobStatusResponse?> GetJobStatusAsync(
             Guid jobId,
             Guid userId,
             CancellationToken ct = default);

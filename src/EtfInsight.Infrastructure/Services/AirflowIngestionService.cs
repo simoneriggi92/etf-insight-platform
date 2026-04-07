@@ -20,8 +20,18 @@ public class AirflowIngestionService(
         Encoding.UTF8.GetBytes(
             $"{config["Airflow:Username"] ?? "airflow"}:{config["Airflow:Password"] ?? "airflow"}"));
 
+    public Task<IngestionStatus> EnsureTickerReadyAsync(
+        string ticker,
+        CancellationToken ct = default)
+    {
+        // For now, we ignore the additional info and just delegate to the existing method
+        return EnsureTickerReadyAsync(ticker, null, null, ct);
+    }
     public async Task<IngestionStatus> EnsureTickerReadyAsync(
-        string ticker, CancellationToken ct = default)
+        string ticker,
+        string? isin,
+        string? name,
+        CancellationToken ct = default)
     {
         ticker = ticker.Trim().ToUpperInvariant();
 
@@ -30,20 +40,29 @@ public class AirflowIngestionService(
             "SELECT status FROM etf_metadata WHERE ticker = @Ticker",
             new { Ticker = ticker });
 
-        if (current == "ready")    return IngestionStatus.Ready;
+        if (current == "ready") return IngestionStatus.Ready;
         if (current is "pending" or "ingesting") return IngestionStatus.Ingesting;
 
         // 2. Insert placeholder row so the FK on transactions is satisfied immediately
         await db.ExecuteAsync("""
-            INSERT INTO etf_metadata (ticker, name, status, is_active, ingestion_requested_at)
-            VALUES (@Ticker, @Ticker, 'pending'::etf_ingestion_status, false, NOW())
+            INSERT INTO etf_metadata (ticker, name, isin, status, is_active, ingestion_requested_at)
+            VALUES (@Ticker, @Name, @Isin, 'pending'::etf_ingestion_status, false, NOW())
             ON CONFLICT (ticker) DO UPDATE
-                SET status = 'pending'::etf_ingestion_status,
-                    ingestion_requested_at = NOW()
-                WHERE etf_metadata.status = 'unknown'::etf_ingestion_status
-                   OR etf_metadata.status = 'error'::etf_ingestion_status;
+                SET status                 = 'pending'::etf_ingestion_status,
+                    ingestion_requested_at = NOW(),
+                    isin                   = COALESCE(etf_metadata.isin, EXCLUDED.isin),
+                    name                   = CASE
+                                                WHEN etf_metadata.name = etf_metadata.ticker
+                                                    AND EXCLUDED.name IS NOT NULL
+                                                THEN EXCLUDED.name
+                                                ELSE etf_metadata.name
+                                             END
+                WHERE etf_metadata.status IN (
+                    'unknown'::etf_ingestion_status,
+                    'error'::etf_ingestion_status
+                );
             """,
-            new { Ticker = ticker });
+            new { Ticker = ticker, Isin = isin, Name = name ?? ticker });
 
         // 3. Trigger Airflow DAG via REST API
         var dagRunId =

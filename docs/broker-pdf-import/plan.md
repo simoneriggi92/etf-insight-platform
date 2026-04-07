@@ -1242,11 +1242,11 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ### Phase 4 — Instrument resolution and JIT
 
-- [ ] Add `IInstrumentResolutionService`
-- [ ] Implement `ISIN -> ticker` resolution strategy
-- [ ] Extend ingestion contract to preserve ISIN and name metadata
-- [ ] Reuse `AirflowIngestionService` for resolved tickers
-- [ ] Derive import-job readiness from `etf_metadata.status`
+- [x] Add `IInstrumentResolutionService`
+- [x] Implement `ISIN -> ticker` resolution strategy
+- [x] Extend ingestion contract to preserve ISIN and name metadata
+- [x] Reuse `AirflowIngestionService` for resolved tickers
+- [x] Derive import-job readiness from `etf_metadata.status`
 
 ### Phase 5 — Frontend
 

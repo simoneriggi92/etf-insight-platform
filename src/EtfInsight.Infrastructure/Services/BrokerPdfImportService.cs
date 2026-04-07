@@ -18,6 +18,8 @@ namespace EtfInsight.Infrastructure.Services
         IPortfolioRepository portfolioRepository,
         IPdfTextExtractor pdfTextExtractor,
         ITradeRepublicParser tradeRepublicParser,
+        IInstrumentResolutionService instrumentResolutionService,
+        IIngestionService ingestionService,
         ILogger<BrokerPdfImportService> logger,
         IConfiguration config) : IBrokerPdfImportService
     {
@@ -115,7 +117,7 @@ namespace EtfInsight.Infrastructure.Services
         /// <param name="userId"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        public async Task<ImportJobStatusResponse> GetJobStatusAsync(Guid jobId, Guid userId, CancellationToken ct = default)
+        public async Task<ImportJobStatusResponse?> GetJobStatusAsync(Guid jobId, Guid userId, CancellationToken ct = default)
         {
             var job = await brokerImportRepository.GetJobAsync(jobId, userId, ct);
             if (job is null)
@@ -125,6 +127,42 @@ namespace EtfInsight.Infrastructure.Services
 
             var items = await brokerImportRepository.GetItemsAsync(jobId, ct);
             var tickerStatuses = await brokerImportRepository.GetTickerStatusesForJobAsync(jobId, ct);
+
+            if (job.Status == "waiting_for_ingestion")
+            {
+                var waitingItems = items
+                    .Where(i => i.Status == "waiting_for_ingestion")
+                    .ToList();
+
+                var allTerminal = waitingItems.Count > 0 && waitingItems.All(i =>
+                    i.ResolvedTicker is not null
+                    && tickerStatuses.TryGetValue(i.ResolvedTicker, out var s)
+                    && s is "ready" or "error");
+
+                if (allTerminal)
+                {
+                    foreach (var w in waitingItems)
+                    {
+                        await brokerImportRepository.UpdateItemAsync(
+                            w with { Status = "imported", UpdatedAt = DateTimeOffset.UtcNow }, ct);
+                    }
+
+                    await brokerImportRepository.UpdateJobCountersAsync(jobId, ct);
+
+                    items = await brokerImportRepository.GetItemsAsync(jobId, ct);
+
+                    var terminalStatus = items.Any(i => i.Status is "failed" or "unresolved_instrument")
+                        ? "completed_with_errors"
+                        : "completed";
+
+                    await brokerImportRepository.MarkJobCompletedAsync(jobId, terminalStatus);
+
+                    job = await brokerImportRepository.GetJobAsync(jobId, userId, ct) ?? job;
+                    logger.LogInformation(
+                        "Import job {JobId} auto-transitioned from waiting_for_ingestion to {Status}",
+                        jobId, terminalStatus);
+                }
+            }
 
             var recentItems = items
                 .OrderByDescending(i => i.UpdatedAt)
@@ -176,11 +214,9 @@ namespace EtfInsight.Infrastructure.Services
                 await brokerImportRepository.UpdateJobStatusAsync(importJobId, "processing",
                     item.OriginalFileName, "Processing file...");
 
-                // Step 1
                 await brokerImportRepository.UpdateItemAsync(
                     item with { Status = "parsing", UpdatedAt = DateTimeOffset.UtcNow }, ct);
 
-                // Step 2
                 PdfExtractionResult extraction;
                 try
                 {
@@ -200,11 +236,9 @@ namespace EtfInsight.Infrastructure.Services
                     continue;
                 }
 
-                // Steps 3–4
                 var normalized = TradeRepublicTextNormalizer.Normalize(extraction.RawText);
                 var kind = TradeRepublicDocumentKindDetector.Detect(extraction.Title, normalized);
 
-                // Step 5
                 if (kind is not (TradeRepublicDocumentKind.BuyConfirmation
                     or TradeRepublicDocumentKind.SellConfirmation
                     or TradeRepublicDocumentKind.SavingsPlanExecution))
@@ -219,10 +253,8 @@ namespace EtfInsight.Infrastructure.Services
                     continue;
                 }
 
-                // Step 6
                 var parseResult = tradeRepublicParser.Parse(extraction);
 
-                // Step 7
                 if (parseResult is TradeRepublicParserResult.Failure failure)
                 {
                     await brokerImportRepository.UpdateItemAsync(
@@ -235,7 +267,6 @@ namespace EtfInsight.Infrastructure.Services
                     continue;
                 }
 
-                // Step 8
                 if (parseResult is TradeRepublicParserResult.Unsupported unsupported)
                 {
                     await brokerImportRepository.UpdateItemAsync(
@@ -250,11 +281,9 @@ namespace EtfInsight.Infrastructure.Services
 
                 var parsed = ((TradeRepublicParserResult.Success)parseResult).Transaction;
 
-                // Step 9
                 var isDuplicate = await brokerImportRepository.IsDocumentAlreadyImportedAsync(
                     item.PortfolioId, item.FileSha256, parsed.BrokerReference, ct);
 
-                // Step 10
                 if (isDuplicate)
                 {
                     await brokerImportRepository.UpdateItemAsync(
@@ -268,36 +297,86 @@ namespace EtfInsight.Infrastructure.Services
                     continue;
                 }
 
-                // Step 11 — all parsed fields persisted; Phase 4 instrument resolution picks up here
+                var parsedItem = item with
+                {
+                    Status = "parsed",
+                    BrokerReference = parsed.BrokerReference,
+                    BrokerSecondaryReference = parsed.BrokerSecondaryReference,
+                    Isin = parsed.Isin,
+                    InstrumentName = parsed.InstrumentName,
+                    TransactionType = parsed.TransactionType,
+                    TransactionDate = parsed.TransactionDate,
+                    SettlementDate = parsed.SettlementDate,
+                    Units = parsed.Units,
+                    PricePerUnit = parsed.PricePerUnit,
+                    Fees = parsed.Fees,
+                    GrossAmount = parsed.GrossAmount,
+                    Currency = parsed.Currency,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+                await brokerImportRepository.UpdateItemAsync(parsedItem, ct);
+
+                var ticker = await instrumentResolutionService.ResolveTickerByIsinAsync(
+                    parsed.Isin, parsed.InstrumentName, ct);
+
+                if (ticker is null)
+                {
+                    await brokerImportRepository.UpdateItemAsync(
+                        parsedItem with
+                        {
+                            Status = "unresolved_instrument",
+                            ErrorMessage = Truncate($"ISIN {parsed.Isin} could not be resolved to a known ticker"),
+                            UpdatedAt = DateTimeOffset.UtcNow
+                        }, ct);
+                    continue;
+                }
+
+                var transactionId = await brokerImportRepository.InsertBrokerTransactionAsync(
+                    new BrokerTransactionInsertRequest(
+                        PortfolioId: item.PortfolioId,
+                        Ticker: ticker,
+                        TransactionType: parsed.TransactionType,
+                        TransactionDate: parsed.TransactionDate,
+                        Units: parsed.Units,
+                        PricePerUnit: parsed.PricePerUnit,
+                        Fees: parsed.Fees,
+                        SourceBroker: "trade_republic",
+                        SourceReference: parsed.BrokerReference,
+                        SourceSecondaryReference: parsed.BrokerSecondaryReference,
+                        SourceDocumentHash: item.FileSha256,
+                        SourceIsin: parsed.Isin,
+                        TradeCurrency: parsed.Currency),
+                    ct);
+
+                var ingestionStatus = await ingestionService.EnsureTickerReadyAsync(
+                    ticker, parsed.Isin, parsed.InstrumentName, ct);
+
+                var finalItemStatus = ingestionStatus == IngestionStatus.Ingesting
+                    ? "waiting_for_ingestion"
+                    : "imported";
+
                 await brokerImportRepository.UpdateItemAsync(
-                    item with
+                    parsedItem with
                     {
-                        Status = "parsed",
-                        BrokerReference = parsed.BrokerReference,
-                        BrokerSecondaryReference = parsed.BrokerSecondaryReference,
-                        Isin = parsed.Isin,
-                        InstrumentName = parsed.InstrumentName,
-                        TransactionType = parsed.TransactionType,
-                        TransactionDate = parsed.TransactionDate,
-                        SettlementDate = parsed.SettlementDate,
-                        Units = parsed.Units,
-                        PricePerUnit = parsed.PricePerUnit,
-                        Fees = parsed.Fees,
-                        GrossAmount = parsed.GrossAmount,
-                        Currency = parsed.Currency,
+                        Status = finalItemStatus,
+                        ResolvedTicker = ticker,
+                        CreatedTransactionId = transactionId,
                         UpdatedAt = DateTimeOffset.UtcNow
                     }, ct);
+
+                logger.LogInformation(
+                    "Item {ItemId} in job {JobId}: ticker={Ticker}, itemStatus={Status}",
+                    item.Id, importJobId, ticker, finalItemStatus);
             }
 
             await brokerImportRepository.UpdateJobCountersAsync(importJobId, ct);
 
             var finalItems = await brokerImportRepository.GetItemsAsync(importJobId, ct);
             var anyWaiting = finalItems.Any(i => i.Status == "waiting_for_ingestion");
-            var anyParsedPendingPhase4 = finalItems.Any(i => i.Status == "parsed");
+            var anyFailed = finalItems.Any(i => i.Status is "failed" or "unresolved_instrument");
 
             var finalStatus = anyWaiting ? "waiting_for_ingestion"
-                : anyParsedPendingPhase4 || finalItems.Any(i => i.Status == "failed")
-                    ? "completed_with_errors"
+                : anyFailed ? "completed_with_errors"
                 : "completed";
 
             await brokerImportRepository.MarkJobCompletedAsync(importJobId, finalStatus);

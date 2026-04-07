@@ -38,4 +38,19 @@ namespace EtfInsight.Core.DTOs
         IReadOnlyList<ImportJobItemResult> RecentItems,
         IReadOnlyDictionary<string, string> TickerIngestionStatuses
     );
+
+    public sealed record BrokerTransactionInsertRequest(
+    Guid PortfolioId,
+    string Ticker,
+    string TransactionType,
+    DateOnly TransactionDate,
+    decimal Units,
+    decimal PricePerUnit,
+    decimal? Fees,
+    string SourceBroker,
+    string? SourceReference,
+    string? SourceSecondaryReference,
+    string SourceDocumentHash,
+    string? SourceIsin,
+    string? TradeCurrency);
 }

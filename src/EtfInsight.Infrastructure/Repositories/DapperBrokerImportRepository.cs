@@ -4,6 +4,7 @@ using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
+using EtfInsight.Core.DTOs;
 using EtfInsight.Core.Entities;
 using EtfInsight.Core.Interfaces;
 
@@ -86,6 +87,40 @@ namespace EtfInsight.Infrastructure.Repositories
                new { JobId = jobId });
 
             return rows.ToDictionary(r => r.ticker, r => r.status);
+        }
+
+        public async Task<Guid> InsertBrokerTransactionAsync(BrokerTransactionInsertRequest request, CancellationToken ct = default)
+        {
+            var id = Guid.NewGuid();
+            return await db.ExecuteScalarAsync<Guid>(
+                """
+                INSERT INTO transactions
+                    (id, portfolio_id, ticker, type, units, price_per_unit, fees, transaction_date,
+                     source_broker, source_reference, source_secondary_reference, source_document_hash,
+                     source_isin, trade_currency)
+                VALUES
+                    (@Id, @PortfolioId, @Ticker, @Type::transaction_type, @Units, @PricePerUnit, @Fees,
+                     @TransactionDate, @SourceBroker, @SourceReference, @SourceSecondaryReference,
+                     @SourceDocumentHash, @SourceIsin, @TradeCurrency)
+                RETURNING id
+                """,
+                new
+                {
+                    Id = id,
+                    request.PortfolioId,
+                    request.Ticker,
+                    Type = request.TransactionType,
+                    request.Units,
+                    request.PricePerUnit,
+                    Fees = request.Fees ?? 0m,
+                    TransactionDate = request.TransactionDate.ToDateTime(TimeOnly.MinValue),
+                    SourceBroker = request.SourceBroker,
+                    SourceReference = request.SourceReference,
+                    SourceSecondaryReference = request.SourceSecondaryReference,
+                    SourceDocumentHash = request.SourceDocumentHash,
+                    SourceIsin = request.SourceIsin,
+                    TradeCurrency = request.TradeCurrency
+                });
         }
 
         public Task<bool> IsDocumentAlreadyImportedAsync(Guid portfolioId, string documentHash, string? brokerReference, CancellationToken ct = default)

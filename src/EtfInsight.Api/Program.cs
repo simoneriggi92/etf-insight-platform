@@ -105,6 +105,7 @@ builder.Services.AddScoped<IPdfTextExtractor, PdfPigTextExtractor>();
 builder.Services.AddScoped<ITradeRepublicParser, TradeRepublicParser>();
 builder.Services.AddScoped<IBrokerImportRepository, DapperBrokerImportRepository>();
 builder.Services.AddScoped<IBrokerPdfImportService, BrokerPdfImportService>();
+builder.Services.AddScoped<IInstrumentResolutionService, EtfMetadataInstrumentResolutionService>();
 
 var app = builder.Build();
 

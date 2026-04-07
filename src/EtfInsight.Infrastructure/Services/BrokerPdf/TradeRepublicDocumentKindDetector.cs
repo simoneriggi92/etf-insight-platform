@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace EtfInsight.Infrastructure.Services.BrokerPdf
 {
-    internal enum TradeRepublicDocumentKind
+    public enum TradeRepublicDocumentKind
     {
         Unknown,
         BuyConfirmation,

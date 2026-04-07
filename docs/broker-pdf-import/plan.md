@@ -1234,11 +1234,11 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Implement instrument name extraction (backwards-scan from `ISIN:` line)
 - [x] Implement per-field decimal parsing (strip thousands `.`, convert `,` to `.`)
 - [x] Implement per-field date parsing (`dd.MM.yyyy` → `DateOnly`)
-- [ ] Add `IsDocumentAlreadyImportedAsync` to `IBrokerImportRepository` and `DapperBrokerImportRepository`
-- [ ] Replace `TODO Phase 3` stub in `ProcessTradeRepublicImportAsync` with full parse-and-duplicate-check loop (steps 1–11 per plan)
-- [ ] Add `<ProjectReference>` to `EtfInsight.Infrastructure` in the test project
-- [ ] Add PDF fixtures to `tests/EtfInsight.Tests/BrokerPdf/Fixtures/` with `CopyToOutputDirectory`
-- [ ] Add unit tests: normalizer, detector, parser (all document kinds + failure modes)
+- [x] Add `IsDocumentAlreadyImportedAsync` to `IBrokerImportRepository` and `DapperBrokerImportRepository`
+- [x] Replace `TODO Phase 3` stub in `ProcessTradeRepublicImportAsync` with full parse-and-duplicate-check loop (steps 1–11 per plan)
+- [x] Add `<ProjectReference>` to `EtfInsight.Infrastructure` in the test project
+- [x] Add PDF fixtures to `tests/EtfInsight.Tests/BrokerPdf/Fixtures/` with `CopyToOutputDirectory`
+- [x] Add unit tests: normalizer, detector, parser (all document kinds + failure modes)
 
 ### Phase 4 — Instrument resolution and JIT
 

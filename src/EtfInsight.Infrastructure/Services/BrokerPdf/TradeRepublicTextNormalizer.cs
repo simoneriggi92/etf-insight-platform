@@ -8,7 +8,7 @@ namespace EtfInsight.Infrastructure.Services.BrokerPdf
 {
     internal static class TradeRepublicTextNormalizer
     {
-        private static readonly Regex MultipleBlankLines = new(@"\n{3,}", RegexOptions.Compiled);
+        private static readonly Regex MultipleBlankLines = new(@"\n{4,}", RegexOptions.Compiled);
 
         private static readonly Regex IntraLineWhitespace = new(@"[^\S\n]+", RegexOptions.Compiled);
 

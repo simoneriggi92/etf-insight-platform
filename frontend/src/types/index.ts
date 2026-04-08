@@ -142,3 +142,59 @@ export interface AiMessage {
   sources?: AiSource[]
   timestamp: string
 }
+
+
+// ── Import Jobs ───────────────────────────────────────────────────────────────
+export type BrokerImportJobStatus =
+  | 'queued'
+  | 'processing'
+  | 'waiting_for_ingestion'
+  | 'completed'
+  | 'completed_with_errors'
+  | 'failed'
+  | 'not_found'
+
+export type BrokerImportItemStatus =
+  | 'queued'
+  | 'parsing'
+  | 'parsed'
+  | 'duplicate'
+  | 'unsupported'
+  | 'unresolved_instrument'
+  | 'waiting_for_ingestion'
+  | 'imported'
+  | 'failed'
+
+export interface StartBrokerImportResponse {
+  jobId: string
+  status: BrokerImportJobStatus
+  totalFiles: number
+  message: string
+}
+
+export interface ImportJobItemResult {
+  fileName: string
+  status: BrokerImportItemStatus
+  isin: string | null
+  resolvedTicker: string | null
+  errorMessage: string | null
+}
+
+export interface ImportJobStatusResponse {
+  jobId: string
+  status: BrokerImportJobStatus
+  totalFiles: number
+  processedFiles: number
+  importedFiles: number
+  duplicateFiles: number
+  failedFiles: number
+  waitingForIngestionFiles: number
+  currentFileName: string | null
+  currentMessage: string | null
+  errorSummary: string | null
+  createdAt: string
+  startedAt: string | null
+  completedAt: string | null
+  recentItems: ImportJobItemResult[]
+  tickerIngestionStatuses: Record<string, string>
+}

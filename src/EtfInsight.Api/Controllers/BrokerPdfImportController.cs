@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using EtfInsight.Core.Interfaces;
 
 namespace EtfInsight.Api.Controllers
 {
@@ -17,7 +18,7 @@ namespace EtfInsight.Api.Controllers
         private const int MaxFilesPerImport = 100;
         private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB per file
 
-        [HttpPost("portfolios/{portfolioId:guid}/import/broker-import")]
+        [HttpPost("portfolios/{portfolioId:guid}/import/broker-pdf")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(StatusCodes.Status202Accepted)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]

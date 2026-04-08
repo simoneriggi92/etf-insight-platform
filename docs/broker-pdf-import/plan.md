@@ -1250,13 +1250,13 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ### Phase 5 — Frontend
 
-- [ ] Add `BrokerImportDropzone.vue`
-- [ ] Add `BrokerPdfImportView.vue`
-- [ ] Add route `/portfolios/:id/import/broker-pdf`
-- [ ] Add upload API call
-- [ ] Add job-polling composable
-- [ ] Add progress bar and recent-results UI
-- [ ] Refresh portfolio data on terminal success
+- [x] Add `BrokerImportDropzone.vue`
+- [x] Add `BrokerPdfImportView.vue`
+- [x] Add route `/portfolios/:id/import/broker-pdf`
+- [x] Add upload API call
+- [x] Add job-polling composable
+- [x] Add progress bar and recent-results UI
+- [x] Refresh portfolio data on terminal success
 
 ### Phase 6 — Hardening
 

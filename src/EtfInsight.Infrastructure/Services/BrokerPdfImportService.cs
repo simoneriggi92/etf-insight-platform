@@ -98,9 +98,12 @@ namespace EtfInsight.Infrastructure.Services
 
             // Enqueue background processing (e.g. with Hangfire, or just trigger it directly here)
             var hangfireJob = BackgroundJob.Enqueue<IBrokerPdfImportService>(
+                "broker-imports", // specify the queue for better isolation and to avoid blocking other jobs
                 service => service.ProcessTradeRepublicImportAsync(jobId, userId, CancellationToken.None));
 
-            logger.LogInformation("Broker PDF import job {JobId} enqueued (Hangfire {HangfireId})", jobId, hangfireJob);
+            logger.LogInformation(
+               "Broker PDF import job {JobId} for portfolio {PortfolioId} enqueued as Hangfire job {HangfireJobId}",
+               jobId, portfolioId, hangfireJob);
 
             return new StartBrokerImportResponse(
                 jobId,
@@ -156,11 +159,12 @@ namespace EtfInsight.Infrastructure.Services
                         : "completed";
 
                     await brokerImportRepository.MarkJobCompletedAsync(jobId, terminalStatus);
+                    DeleteJobTempFolder(jobId);
 
                     job = await brokerImportRepository.GetJobAsync(jobId, userId, ct) ?? job;
                     logger.LogInformation(
-                        "Import job {JobId} auto-transitioned from waiting_for_ingestion to {Status}",
-                        jobId, terminalStatus);
+                        "Import job {JobId} for portfolio {PortfolioId} auto-transitioned from waiting_for_ingestion to {FinalStatus}",
+                        jobId, job.PortfolioId, terminalStatus);
                 }
             }
 
@@ -206,6 +210,7 @@ namespace EtfInsight.Infrastructure.Services
         {
             await brokerImportRepository.UpdateJobStatusAsync(importJobId, "processing");
             var items = await brokerImportRepository.GetItemsAsync(importJobId, ct);
+            var portfolioId = items.FirstOrDefault()?.PortfolioId ?? Guid.Empty;
 
             static string Truncate(string s) => s.Length > 500 ? s[..500] : s;
 
@@ -225,7 +230,8 @@ namespace EtfInsight.Infrastructure.Services
                 catch (Exception ex)
                 {
                     logger.LogWarning(ex,
-                        "PDF extraction failed for {FileName} in job {JobId}", item.OriginalFileName, importJobId);
+                        "PDF extraction failed for item {ItemId} ({FileName}) in job {JobId} for portfolio {PortfolioId}",
+                        item.Id, item.OriginalFileName, importJobId, portfolioId);
                     await brokerImportRepository.UpdateItemAsync(
                         item with
                         {
@@ -365,8 +371,8 @@ namespace EtfInsight.Infrastructure.Services
                     }, ct);
 
                 logger.LogInformation(
-                    "Item {ItemId} in job {JobId}: ticker={Ticker}, itemStatus={Status}",
-                    item.Id, importJobId, ticker, finalItemStatus);
+                    "Item {ItemId} in job {JobId} for portfolio {PortfolioId}: isin={Isin}, ticker={Ticker}, itemStatus={ItemStatus}",
+                    item.Id, importJobId, portfolioId, parsed.Isin, ticker, finalItemStatus);
             }
 
             await brokerImportRepository.UpdateJobCountersAsync(importJobId, ct);
@@ -380,7 +386,53 @@ namespace EtfInsight.Infrastructure.Services
                 : "completed";
 
             await brokerImportRepository.MarkJobCompletedAsync(importJobId, finalStatus);
-            logger.LogInformation("Import job {JobId} finished with status {Status}", importJobId, finalStatus);
+
+            if (!anyWaiting)
+            {
+                DeleteJobTempFolder(importJobId);
+            }
+
+            logger.LogInformation(
+                "Import job {JobId} for portfolio {PortfolioId} finished with status {FinalStatus}",
+                importJobId, portfolioId, finalStatus);
+        }
+
+        private void DeleteJobTempFolder(Guid jobId)
+        {
+            var folder = Path.Combine(_tempRoot, jobId.ToString());
+            try
+            {
+                if (Directory.Exists(folder))
+                    Directory.Delete(folder, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to delete temp folder for job {JobId}", jobId);
+            }
+        }
+
+        public Task CleanupStaleTempFoldersAsync(CancellationToken ct = default)
+        {
+            if (!Directory.Exists(_tempRoot))
+                return Task.CompletedTask;
+
+            var threshold = DateTime.UtcNow.AddHours(-24);
+
+            foreach (var folder in Directory.GetDirectories(_tempRoot))
+            {
+                try
+                {
+                    if (Directory.GetCreationTimeUtc(folder) < threshold)
+                        Directory.Delete(folder, recursive: true);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex,
+                        "Failed to delete stale broker import temp folder {Folder}", folder);
+                }
+            }
+
+            return Task.CompletedTask;
         }
     }
 }

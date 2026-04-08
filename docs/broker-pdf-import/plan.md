@@ -1260,9 +1260,9 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ### Phase 6 — Hardening
 
-- [ ] Raise Nginx upload limits
-- [ ] Configure ASP.NET multipart limits if needed
-- [ ] Add temp-file cleanup
-- [ ] Add structured logging around job id and item id
-- [ ] Consider dedicated Hangfire queue for imports
-- [ ] Add parser, service, API, and integration tests
+- [x] Raise Nginx upload limits
+- [x] Configure ASP.NET multipart limits if needed
+- [x] Add temp-file cleanup
+- [x] Add structured logging around job id and item id
+- [x] Consider dedicated Hangfire queue for imports
+- [x] Add parser, service, API, and integration tests

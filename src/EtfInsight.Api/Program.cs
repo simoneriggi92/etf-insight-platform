@@ -17,6 +17,7 @@ using EtfInsight.DataQuality.Services;
 using Hangfire;
 using Hangfire.PostgreSql;
 using EtfInsight.Api.Filters;
+using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -54,6 +55,7 @@ builder.Services.AddHangfireServer(options =>
 {
     options.WorkerCount = 2;
     options.ServerName = "etf-insight-bgserver";
+    options.Queues = new[] { "broker-imports", "default" };
 });
 
 builder.Services.Configure<AISettings>(builder.Configuration.GetSection("AI"));
@@ -107,6 +109,16 @@ builder.Services.AddScoped<IBrokerImportRepository, DapperBrokerImportRepository
 builder.Services.AddScoped<IBrokerPdfImportService, BrokerPdfImportService>();
 builder.Services.AddScoped<IInstrumentResolutionService, EtfMetadataInstrumentResolutionService>();
 
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 1_073_741_824;
+});
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 1_073_741_824;
+});
+
 var app = builder.Build();
 
 // Hangfire dashboard (optional, for monitoring background jobs)
@@ -122,6 +134,12 @@ RecurringJob.AddOrUpdate<DataQualityScanner>(
     "nightly-data-quality-scan",
     scanner => scanner.ScanRecentPricesAsync(),
     Cron.Daily(2) // Every day at 2:00 AM
+);
+
+RecurringJob.AddOrUpdate<IBrokerPdfImportService>(
+    "cleanup-stale-broker-import-temp-folders",
+    service => service.CleanupStaleTempFoldersAsync(CancellationToken.None),
+    Cron.Daily(3)
 );
 
 // Request logging middleware

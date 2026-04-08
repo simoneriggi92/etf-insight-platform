@@ -4,19 +4,17 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using EtfInsight.Core.Interfaces;
+using EtfInsight.Api.Extensions;
 
 namespace EtfInsight.Api.Controllers
 {
     [ApiController]
     [Route("api")]
     [Produces("application/json")]
-    public class BrokerPdfImportController(
-        IBrokerPdfImportService importService,
-        ILogger<BrokerPdfImportController> logger) : ControllerBase
+    public class BrokerPdfImportController(IBrokerPdfImportService importService) : ControllerBase
     {
-
         private const int MaxFilesPerImport = 100;
-        private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB per file
+        private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
         [HttpPost("portfolios/{portfolioId:guid}/import/broker-pdf")]
         [Consumes("multipart/form-data")]
@@ -25,39 +23,31 @@ namespace EtfInsight.Api.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> StartImport(
             Guid portfolioId,
-            [FromForm] IFormCollection files,
+            [FromForm] IFormCollection form,
             CancellationToken ct = default)
         {
-
             var userId = HttpContext.GetGuestId();
 
-            if (files == null || files.Files.Count == 0)
-            {
+            if (form == null || form.Files.Count == 0)
                 return BadRequest(new { Error = "At least one PDF file is required." });
-            }
 
-            if (files.Count > MaxFilesPerImport)
-            {
+            if (form.Files.Count > MaxFilesPerImport)
                 return BadRequest(new { Error = $"A maximum of {MaxFilesPerImport} files can be uploaded per import." });
-            }
 
-            var invalids = files
+            var invalids = form.Files
                 .Where(f => f.Length == 0 || f.Length > MaxFileSizeBytes || !f.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-                .Select(f => new { FileName = f.FileName, Size = f.Length })
+                .Select(f => new { f.FileName, Size = f.Length })
                 .ToList();
 
-            if (invalids.Any())
-            {
+            if (invalids.Count > 0)
                 return BadRequest(new { Error = "Invalid files (empty, >10 MB, or not .pdf).", Files = invalids });
-            }
 
-            var result = await importService.StartImportAsync(portfolioId, userId, files.Files, ct);
+            var result = await importService.StartImportAsync(portfolioId, userId, form.Files, ct);
 
             return result.Status == "not_found"
                 ? NotFound(new { Error = $"Portfolio {portfolioId} not found or not owned by you." })
-                : AcceptedAtAction(result);
+                : Accepted(result);
         }
-
 
         [HttpGet("import-jobs/{jobId:guid}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -71,6 +61,5 @@ namespace EtfInsight.Api.Controllers
                 ? NotFound(new { Error = $"Import job {jobId} not found or not owned by you." })
                 : Ok(result);
         }
-
     }
 }

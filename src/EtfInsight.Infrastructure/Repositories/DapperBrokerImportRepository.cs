@@ -19,7 +19,7 @@ namespace EtfInsight.Infrastructure.Repositories
                 INSERT INTO broker_import_jobs
                     (id, portfolio_id, user_id, broker, status, total_files, created_at)
                 VALUES
-                    (@Id, @PortfolioId, @UserId, @Broker, @Status, @TotalFiles, @CreatedAt)
+                    (@Id, @PortfolioId, @UserId, @Broker, @Status::broker_import_job_status, @TotalFiles, @CreatedAt)
                 """, job);
 
             await db.ExecuteAsync(
@@ -29,7 +29,7 @@ namespace EtfInsight.Infrastructure.Repositories
                     file_sha256, status, created_at, updated_at)
                 VALUES
                     (@Id, @JobId, @PortfolioId, @OriginalFileName, @TempFilePath,
-                    @FileSha256, @Status, @CreatedAt, @UpdatedAt)
+                    @FileSha256, @Status::broker_import_item_status, @CreatedAt, @UpdatedAt)
                 """, items);
         }
 

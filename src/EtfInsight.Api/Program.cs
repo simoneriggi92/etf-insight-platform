@@ -2,6 +2,7 @@ using Npgsql;
 using Dapper;
 using System.Data;
 using EtfInsight.Api.Services;
+using EtfInsight.Infrastructure.TypeHandlers;
 using EtfInsight.Core.Interfaces;
 using EtfInsight.Core.Entities;
 using EtfInsight.Infrastructure.Repositories;
@@ -20,6 +21,8 @@ using EtfInsight.Api.Filters;
 using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
+
+SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
 
 // Add services to the container.
 builder.Services.AddControllers();

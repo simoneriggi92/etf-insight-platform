@@ -212,7 +212,6 @@ namespace EtfInsight.Infrastructure.Services
             var items = await brokerImportRepository.GetItemsAsync(importJobId, ct);
             var portfolioId = items.FirstOrDefault()?.PortfolioId ?? Guid.Empty;
 
-            static string Truncate(string s) => s.Length > 500 ? s[..500] : s;
 
             foreach (var item in items)
             {
@@ -232,13 +231,13 @@ namespace EtfInsight.Infrastructure.Services
                     logger.LogWarning(ex,
                         "PDF extraction failed for item {ItemId} ({FileName}) in job {JobId} for portfolio {PortfolioId}",
                         item.Id, item.OriginalFileName, importJobId, portfolioId);
-                    await brokerImportRepository.UpdateItemAsync(
-                        item with
-                        {
-                            Status = "failed",
-                            ErrorMessage = Truncate($"extraction: {ex.Message}"),
-                            UpdatedAt = DateTimeOffset.UtcNow
-                        }, ct);
+
+                    await UpdateItemAsync(
+                        item,
+                        "failed",
+                        $"extraction: {ex.Message}",
+                        ct);
+
                     continue;
                 }
 
@@ -249,13 +248,12 @@ namespace EtfInsight.Infrastructure.Services
                     or TradeRepublicDocumentKind.SellConfirmation
                     or TradeRepublicDocumentKind.SavingsPlanExecution))
                 {
-                    await brokerImportRepository.UpdateItemAsync(
-                        item with
-                        {
-                            Status = "unsupported",
-                            ErrorMessage = Truncate($"Document kind not supported in V1: {kind}"),
-                            UpdatedAt = DateTimeOffset.UtcNow
-                        }, ct);
+                    await UpdateItemAsync(
+                        item,
+                        "unsupported",
+                        $"Document kind not supported in V1: {kind}",
+                        ct);
+
                     continue;
                 }
 
@@ -263,25 +261,23 @@ namespace EtfInsight.Infrastructure.Services
 
                 if (parseResult is TradeRepublicParserResult.Failure failure)
                 {
-                    await brokerImportRepository.UpdateItemAsync(
-                        item with
-                        {
-                            Status = "failed",
-                            ErrorMessage = Truncate($"{failure.Stage}: {failure.Reason}"),
-                            UpdatedAt = DateTimeOffset.UtcNow
-                        }, ct);
+                    await UpdateItemAsync(
+                        item,
+                        "failed",
+                        $"{failure.Stage}: {failure.Reason}",
+                        ct);
+
                     continue;
                 }
 
                 if (parseResult is TradeRepublicParserResult.Unsupported unsupported)
                 {
-                    await brokerImportRepository.UpdateItemAsync(
-                        item with
-                        {
-                            Status = "unsupported",
-                            ErrorMessage = Truncate(unsupported.Reason),
-                            UpdatedAt = DateTimeOffset.UtcNow
-                        }, ct);
+                    await UpdateItemAsync(
+                        item,
+                        "unsupported",
+                        unsupported.Reason,
+                        ct);
+
                     continue;
                 }
 
@@ -327,13 +323,12 @@ namespace EtfInsight.Infrastructure.Services
 
                 if (ticker is null)
                 {
-                    await brokerImportRepository.UpdateItemAsync(
-                        parsedItem with
-                        {
-                            Status = "unresolved_instrument",
-                            ErrorMessage = Truncate($"ISIN {parsed.Isin} could not be resolved to a known ticker"),
-                            UpdatedAt = DateTimeOffset.UtcNow
-                        }, ct);
+                    await UpdateItemAsync(
+                        parsedItem,
+                        "unresolved_instrument",
+                        $"ISIN {parsed.Isin} could not be resolved to a known ticker",
+                        ct);
+
                     continue;
                 }
 
@@ -395,6 +390,19 @@ namespace EtfInsight.Infrastructure.Services
             logger.LogInformation(
                 "Import job {JobId} for portfolio {PortfolioId} finished with status {FinalStatus}",
                 importJobId, portfolioId, finalStatus);
+        }
+
+        private async Task UpdateItemAsync(BrokerImportJobItem item, string status, string? errorMessage, CancellationToken ct)
+        {
+            static string Truncate(string s) => s.Length > 500 ? s[..500] : s;
+
+            await brokerImportRepository.UpdateItemAsync(
+                item with
+                {
+                    Status = status,
+                    ErrorMessage = errorMessage is not null ? Truncate(errorMessage) : null,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                }, ct);
         }
 
         private void DeleteJobTempFolder(Guid jobId)

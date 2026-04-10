@@ -71,6 +71,14 @@ public class TradeRepublicParserTests
         "\n" +
         "DATA 10.03.2026";
 
+    private const string FlattenedSavingsPlanText =
+        "TRADE REPUBLIC BANK GMBH, BRANCH ITALY SPACES GAE AULENTI, PIAZZA GAE AULENTI 1, TORRE B20154 MILANO (MI)" +
+        "PAGINA1 da 1DATA02.03.2026ESECUZIONE100c-2d49PIANO DI ACCUMULOc57a-f6c2CONTO TITOLI3079293601" +
+        "PIANO D'INVESTIMENTO PER IL REGOLAMENTO DEI TITOLIPANORAMICAEsecuzione del piano d'accumulo il 02.03.2026 " +
+        "su Lang und Schwarz Exchange.La controparte dell'operazione è Lang & Schwarz TradeCenter AG & Co. KG." +
+        "POSIZIONEQUANTITÀPREZZO MEDIOIMPORTOCore MSCI World USD (Acc)ISIN: IE00B4L5Y9837,378349113,8466 EUR840,00 EUR" +
+        "TOTALE840,00 EURPRENOTAZIONECONTO DI TRANSITODATA VALUTAIMPORTOIT83A03674016000030792936112026-03-04-840,00 EUR";
+
     [Fact]
     public void parses_savings_plan_execution_successfully()
     {
@@ -90,6 +98,26 @@ public class TradeRepublicParserTests
         Assert.Equal("c57a-f6c2", tx.BrokerSecondaryReference);
         Assert.Equal("Core MSCI World USD (Acc)", tx.InstrumentName);
         Assert.Null(tx.Fees);
+    }
+
+    [Fact]
+    public void parses_flattened_savings_plan_text_with_merged_numeric_fields()
+    {
+        var result = _parser.Parse(new PdfExtractionResult("Savings Plan Execution", FlattenedSavingsPlanText));
+
+        var success = Assert.IsType<TradeRepublicParserResult.Success>(result);
+        var tx = success.Transaction;
+        Assert.Equal("IE00B4L5Y983", tx.Isin);
+        Assert.Equal("BUY", tx.TransactionType);
+        Assert.Equal(new DateOnly(2026, 3, 2), tx.TransactionDate);
+        Assert.Equal(new DateOnly(2026, 3, 4), tx.SettlementDate);
+        Assert.Equal(7.378349m, tx.Units);
+        Assert.Equal(113.8466m, tx.PricePerUnit);
+        Assert.Equal(840.00m, tx.GrossAmount);
+        Assert.Equal("EUR", tx.Currency);
+        Assert.Equal("100c-2d49", tx.BrokerReference);
+        Assert.Equal("c57a-f6c2", tx.BrokerSecondaryReference);
+        Assert.Equal("Core MSCI World USD (Acc)", tx.InstrumentName);
     }
 
     [Fact]
@@ -230,6 +258,16 @@ public class TradeRepublicParserTests
     public void broker_reference_is_null_when_esecuzione_is_absent()
     {
         var textWithoutRef = SavingsPlanText.Replace("ESECUZIONE 100c-2d49\n", string.Empty);
+        var result = _parser.Parse(new PdfExtractionResult("Savings Plan Execution", textWithoutRef));
+
+        var success = Assert.IsType<TradeRepublicParserResult.Success>(result);
+        Assert.Null(success.Transaction.BrokerReference);
+    }
+
+    [Fact]
+    public void broker_reference_does_not_fall_back_to_sentence_text_when_flattened_reference_is_missing()
+    {
+        var textWithoutRef = FlattenedSavingsPlanText.Replace("ESECUZIONE100c-2d49", string.Empty);
         var result = _parser.Parse(new PdfExtractionResult("Savings Plan Execution", textWithoutRef));
 
         var success = Assert.IsType<TradeRepublicParserResult.Success>(result);

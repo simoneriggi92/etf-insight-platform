@@ -18,7 +18,7 @@ namespace EtfInsight.Infrastructure.Services
             ArgumentNullException.ThrowIfNull(isin);
 
             return await db.ExecuteScalarAsync<string?>(
-                "SELECT Ticker FROM EtfMetadata WHERE isin = @Isin LIMIT 1",
+                "SELECT Ticker FROM etf_metadata WHERE isin = @Isin LIMIT 1",
                 new { Isin = isin.ToUpperInvariant() });
         }
     }

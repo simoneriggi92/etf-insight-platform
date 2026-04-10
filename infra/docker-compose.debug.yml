@@ -1,0 +1,15 @@
+# Overrides the etf_api service for local debugging.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.debug.yml up --build etf_api
+#
+# This file ONLY overrides etf_api. All other services come from docker-compose.yml.
+
+services:
+  etf_api:
+    build:
+      context: ../src
+      dockerfile: EtfInsight.Api/Dockerfile.debug
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    # Keep stdin open so vsdbg can attach
+    stdin_open: true
+    tty: true

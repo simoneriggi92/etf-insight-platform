@@ -11,6 +11,11 @@ public sealed class DateOnlyTypeHandler : SqlMapper.TypeHandler<DateOnly>
         parameter.Value = value.ToDateTime(TimeOnly.MinValue);
     }
 
-    public override DateOnly Parse(object value) =>
-        DateOnly.FromDateTime((DateTime)value);
+    public override DateOnly Parse(object value) => value switch
+    {
+        DateOnly dateOnly => dateOnly,
+        DateTime dateTime => DateOnly.FromDateTime(dateTime),
+        _ => throw new DataException(
+            $"Cannot convert {value.GetType().FullName} to {nameof(DateOnly)}.")
+    };
 }

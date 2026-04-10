@@ -898,12 +898,16 @@ so tests run correctly after `dotnet test` without manual file copying.
 
 Recommended lookup order:
 
-1. find `etf_metadata` by `isin`
-2. if found, use the existing `ticker`
-3. if not found, call a new `IInstrumentResolutionService`
-4. if resolution succeeds, upsert `etf_metadata` with `ticker + isin + name`
-5. call the existing JIT ingestion path
-6. if resolution fails, mark the item `unresolved_instrument`
+1. Query `etf_metadata.ticker` by `isin` — fast path, DB-only via `IInstrumentResolutionService.ResolveTickerByIsinAsync`
+2. If found, use the existing `ticker` → proceed to step 5
+3. If not found, attempt external ISIN → ticker resolution via a second code path inside `IInstrumentResolutionService` (e.g., OpenFIGI or equivalent registry)
+   - this is a separate operation from step 1, not a merged call
+   - the current `EtfMetadataInstrumentResolutionService` implements **only** step 1; step 3 has not been implemented yet
+4. If external resolution succeeds, upsert `etf_metadata` with `ticker + isin + name`
+5. Call the existing JIT ingestion path (`EnsureTickerReadyAsync` with `ticker`, `isin`, `name`)
+6. Only after steps 1–3 are exhausted and no ticker has been found, mark the item `unresolved_instrument`
+
+**Implementation constraint:** a null return from the step-1 DB lookup must not trigger `unresolved_instrument` directly. The current `ProcessTradeRepublicImportAsync` has a bug where a null result from `ResolveTickerByIsinAsync` immediately marks the item `unresolved_instrument` and issues a `continue` — bypassing step 3 (external resolution) and step 5 (JIT trigger) entirely. Any ISIN not already in `etf_metadata` is silently dropped with no transaction inserted.
 
 ### 10.2 New resolver abstraction
 
@@ -916,7 +920,12 @@ Purpose:
 - isolate the unavoidable `ISIN -> ticker` bridge
 - keep broker parsing separate from market-data provider logic
 
-This service can evolve independently from the PDF parser.
+The service must support two distinct resolution phases:
+
+- **Phase 1 (fast path):** query `etf_metadata` by `isin` — no external network call. Current implementation: `EtfMetadataInstrumentResolutionService`.
+- **Phase 2 (slow path):** call an external ISIN registry to derive a tradeable ticker symbol when the ISIN is not yet in the local database. **Not yet implemented.**
+
+Until Phase 2 is implemented, any ISIN absent from `etf_metadata` will remain unresolvable regardless of correctness of the surrounding flow. The service can evolve independently from the PDF parser.
 
 ### 10.3 Extend ingestion service contract
 
@@ -933,14 +942,16 @@ Reason:
 
 ### 10.4 Do not invent fake tickers
 
-If an unknown ISIN cannot be mapped to a real ticker:
+If an unknown ISIN cannot be mapped to a real ticker after **all** resolution attempts — both the DB fast path (step 1) and the external resolver (step 3) — have been exhausted:
 
 - do not create a synthetic ticker just to satisfy the foreign key
 - do not insert a transaction that analytics cannot value correctly
 
 Instead:
 
-- keep the item failed with a clear unresolved-instrument reason
+- keep the item failed with a clear `unresolved_instrument` reason
+
+This constraint governs only the terminal failure case. It must not be applied prematurely after step 1 alone. Reaching `unresolved_instrument` before step 3 is attempted is an implementation error, not a correct scope restriction.
 
 ### 10.5 Transaction insertion timing
 
@@ -1243,10 +1254,12 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 ### Phase 4 — Instrument resolution and JIT
 
 - [x] Add `IInstrumentResolutionService`
-- [x] Implement `ISIN -> ticker` resolution strategy
+- [~] Implement `ISIN -> ticker` resolution strategy — Phase 1 (DB lookup via `EtfMetadataInstrumentResolutionService`) done; Phase 2 (external ISIN registry) not yet implemented
 - [x] Extend ingestion contract to preserve ISIN and name metadata
 - [x] Reuse `AirflowIngestionService` for resolved tickers
 - [x] Derive import-job readiness from `etf_metadata.status`
+- [ ] Bug fix: in `ProcessTradeRepublicImportAsync`, when `ResolveTickerByIsinAsync` returns null, do not immediately mark the item `unresolved_instrument` and `continue` — this skips step 3 (external resolution) and step 5 (JIT trigger), causing any ISIN absent from `etf_metadata` to be dropped silently without a transaction insert or ingestion attempt
+- [ ] Implement Phase 2 external ISIN → ticker resolver in `IInstrumentResolutionService` (e.g., OpenFIGI or equivalent) so that a null DB result is followed by an external lookup before the item is failed
 
 ### Phase 5 — Frontend
 

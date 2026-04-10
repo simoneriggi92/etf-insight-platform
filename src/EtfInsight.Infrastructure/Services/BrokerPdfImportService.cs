@@ -332,6 +332,9 @@ namespace EtfInsight.Infrastructure.Services
                     continue;
                 }
 
+                var ingestionStatus = await ingestionService.EnsureTickerReadyAsync(
+                    ticker, parsed.Isin, parsed.InstrumentName, ct);
+
                 var transactionId = await brokerImportRepository.InsertBrokerTransactionAsync(
                     new BrokerTransactionInsertRequest(
                         PortfolioId: item.PortfolioId,
@@ -349,8 +352,6 @@ namespace EtfInsight.Infrastructure.Services
                         TradeCurrency: parsed.Currency),
                     ct);
 
-                var ingestionStatus = await ingestionService.EnsureTickerReadyAsync(
-                    ticker, parsed.Isin, parsed.InstrumentName, ct);
 
                 var finalItemStatus = ingestionStatus == IngestionStatus.Ingesting
                     ? "waiting_for_ingestion"

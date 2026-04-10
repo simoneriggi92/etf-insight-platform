@@ -43,7 +43,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddHttpClient("Ollama");
 builder.Services.AddHttpClient("Airflow");
-
+builder.Services.AddHttpClient("OpenFigi");
 
 // Hangfire configuration
 builder.Services.AddHangfire(config => config
@@ -110,7 +110,7 @@ builder.Services.AddScoped<IPdfTextExtractor, PdfPigTextExtractor>();
 builder.Services.AddScoped<ITradeRepublicParser, TradeRepublicParser>();
 builder.Services.AddScoped<IBrokerImportRepository, DapperBrokerImportRepository>();
 builder.Services.AddScoped<IBrokerPdfImportService, BrokerPdfImportService>();
-builder.Services.AddScoped<IInstrumentResolutionService, EtfMetadataInstrumentResolutionService>();
+builder.Services.AddScoped<IInstrumentResolutionService, OpenFigInstrumentResolutionService>();
 
 builder.WebHost.ConfigureKestrel(options =>
 {

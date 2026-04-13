@@ -99,7 +99,7 @@ namespace EtfInsight.Infrastructure.Repositories
                      source_broker, source_reference, source_secondary_reference, source_document_hash,
                      source_isin, trade_currency)
                 VALUES
-                    (@Id, @PortfolioId, @Ticker, @Type::transaction_type, @Units, @PricePerUnit, @Fees,
+                    (@Id, @PortfolioId, @Ticker, @TransactionType, @Units, @PricePerUnit, @Fees,
                      @TransactionDate, @SourceBroker, @SourceReference, @SourceSecondaryReference,
                      @SourceDocumentHash, @SourceIsin, @TradeCurrency)
                 RETURNING id
@@ -109,7 +109,7 @@ namespace EtfInsight.Infrastructure.Repositories
                     Id = id,
                     request.PortfolioId,
                     request.Ticker,
-                    Type = request.TransactionType,
+                    TransactionType = request.TransactionType,
                     request.Units,
                     request.PricePerUnit,
                     Fees = request.Fees ?? 0m,

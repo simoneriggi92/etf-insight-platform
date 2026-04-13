@@ -1258,8 +1258,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Extend ingestion contract to preserve ISIN and name metadata
 - [x] Reuse `AirflowIngestionService` for resolved tickers
 - [x] Derive import-job readiness from `etf_metadata.status`
-- [ ] Bug fix: in `ProcessTradeRepublicImportAsync`, when `ResolveTickerByIsinAsync` returns null, do not immediately mark the item `unresolved_instrument` and `continue` — this skips step 3 (external resolution) and step 5 (JIT trigger), causing any ISIN absent from `etf_metadata` to be dropped silently without a transaction insert or ingestion attempt
-- [ ] Implement Phase 2 external ISIN → ticker resolver in `IInstrumentResolutionService` (e.g., OpenFIGI or equivalent) so that a null DB result is followed by an external lookup before the item is failed
+- [x] Bug fix: in `ProcessTradeRepublicImportAsync`, when `ResolveTickerByIsinAsync` returns null, do not immediately mark the item `unresolved_instrument` and `continue` — this skips step 3 (external resolution) and step 5 (JIT trigger), causing any ISIN absent from `etf_metadata` to be dropped silently without a transaction insert or ingestion attempt
+- [x] Implement Phase 2 external ISIN → ticker resolver in `IInstrumentResolutionService` (e.g., OpenFIGI or equivalent) so that a null DB result is followed by an external lookup before the item is failed
 
 ### Phase 5 — Frontend
 

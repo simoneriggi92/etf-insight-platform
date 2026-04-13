@@ -118,6 +118,20 @@ CREATE INDEX IF NOT EXISTS idx_broker_import_items_status
 -- ─────────────────────────────────────────────────────────────────────────────
 -- name is already VARCHAR(200) and ticker is already VARCHAR(20) — no changes needed.
 
+-- Resolve duplicate ISINs before creating the unique index.
+-- Rows with transactions cannot be deleted (FK constraint), so we clear the isin
+-- on the non-canonical duplicates instead. The canonical row is the one with the
+-- most recent ingestion_requested_at, falling back to earliest created_at.
+UPDATE etf_metadata
+SET isin = NULL
+WHERE isin IS NOT NULL
+  AND ctid NOT IN (
+      SELECT DISTINCT ON (isin) ctid
+      FROM etf_metadata
+      WHERE isin IS NOT NULL
+      ORDER BY isin, ingestion_requested_at DESC NULLS LAST, created_at ASC NULLS LAST
+  );
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_etf_metadata_isin
     ON etf_metadata(isin)
     WHERE isin IS NOT NULL;

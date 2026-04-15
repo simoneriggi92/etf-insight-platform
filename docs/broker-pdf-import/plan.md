@@ -1,6 +1,6 @@
 # Broker PDF Import — Architecture & Implementation Plan
 
-Last updated: 2026-03-23
+Last updated: 2026-04-15
 
 ## Goal
 
@@ -62,30 +62,41 @@ The broker-PDF feature should therefore be implemented as:
 - `CsvImportDropzone.vue` already shows the general drag-and-drop import pattern
 - `useIngestionStore` already proves the frontend can track asynchronous ingestion and refresh the active portfolio
 
-### What the provided sample confirms
+### What the provided samples confirm
 
-The provided sample PDF `/Users/simone/Downloads/pb1772470152891748018757362691.pdf` is useful because it confirms several assumptions with an actual Trade Republic document instead of a hypothetical one.
+Two real Trade Republic PDFs have been analysed with confirmed normalized body text.
 
-Confirmed from this sample:
+#### Sample 1 — Savings Plan Execution (`test.pdf`)
 
-- it is a native digital PDF with a readable text layer, so V1 does not need OCR for this document type
-- it is a one-page savings plan execution dated 2026-03-02
-- the PDF metadata title is `Savings Plan Execution`, while the visible body text is in Italian
-- the document exposes `ESECUZIONE 100c-2d49`, which looks like a good primary broker execution reference
-- the document also exposes `PIANO DI ACCUMULO c57a-f6c2`, which looks like a recurring plan reference, not a unique transaction id
-- the instrument name is present: `Core MSCI World USD (Acc)`
-- the ISIN is present: `IE00B4L5Y983`
-- the quantity is present with 6 decimals: `7,378349`
-- the average price is present with 4 decimals: `113,8466 EUR`
-- the gross amount is present: `840,00 EUR`
-- a settlement or value date is present separately: `2026-03-04`
+PDF from an automatically placed recurring PAC (Piano di Accumulo) order.
 
-Not present in this sample:
+- PDF title: `Savings Plan Execution`; body text in Italian
+- Table header: `POSIZIONE QUANTITÀ PREZZO MEDIO IMPORTO` (includes `MEDIO`)
+- Execution ref: `ESECUZIONE 100c-2d49` → `BrokerReference`
+- Plan ref: `PIANO DI ACCUMULO c57a-f6c2` → `BrokerSecondaryReference`
+- Instrument: `Core MSCI World USD (Acc)`, ISIN `IE00B4L5Y983`
+- Units: `7,378349` (6 decimal places); price: `113,8466 EUR`; gross: `840,00 EUR`
+- Transaction date label: `DATA 02.03.2026` (format `DD.MM.YYYY`)
+- Settlement date label: `DATA VALUTA` followed on next line by ISO date `2026-03-04`
+- No fee line; one `TOTALE` line
 
-- no ticker
-- no explicit fee line
+#### Sample 2 — Securities Settlement (`test2.pdf`)
 
-This means the plan must treat `ISIN -> ticker` resolution as mandatory, must use execution date rather than value date for the portfolio transaction date, and must increase transaction quantity precision beyond the current `NUMERIC(18,4)`.
+PDF from a manually placed market order (not a PAC recurrence). Conceptually the same transaction type — a BUY — but the document layout differs in several important ways.
+
+- PDF title: `Securities Settlement`; body text in Italian
+- Table header: `POSIZIONE QUANTITÀ PREZZO IMPORTO` (**no `MEDIO`**)
+- Execution ref: `ESECUZIONE 3754-af14` → `BrokerReference`
+- Order ref: `ORDINA d74c-69c3` → `BrokerSecondaryReference` (replaces `PIANO DI ACCUMULO`)
+- Instrument: `Global Aggregate Bond EUR (Acc)`, ISIN `IE00BDBRDM35`
+- Units: `40,6603` (4 decimal places); price: `234,9188 EUR`; gross: `200,00 EUR`
+- Transaction date label: `DATA 12.12.2025` (same format `DD.MM.YYYY`)
+- Settlement date label: `DATA DI VALUTA` (**includes `DI`**), ISO date `2025-12-16`
+- `FATTURAZIONE` section present: `Supplemento spese di terzi -1,00 EUR`; fee = `1,00 EUR`
+- Two `TOTALE` lines: first `200,00 EUR` (instrument gross), second `-201,00 EUR` (net with fee)
+- Body keyword `Acquisto` present in `Market-Order Acquisto su 12.12.2025` → maps to `BuyConfirmation`
+
+Both samples confirm no ticker is present. `ISIN -> ticker` resolution remains mandatory. Transaction quantity precision beyond `NUMERIC(18,4)` is required for both.
 
 ### What is not sufficient as-is
 
@@ -294,32 +305,34 @@ Before implementation starts, lock down the document assumptions with real sampl
 
 Need at least:
 
-- one buy confirmation
+- one savings plan execution (PAC automatic order, `Savings Plan Execution` title) ✓ confirmed from `test.pdf`
+- one securities settlement buy (manual market order, `Securities Settlement` title) ✓ confirmed from `test2.pdf`
+- one buy confirmation (`Order Confirmation` title variant)
 - one sell confirmation
-- one savings plan execution
 - one unsupported document type
 - one duplicate sample
 - one file that should fail parsing cleanly
 
 ### 6.2 Confirm which stable identifiers are present
 
-The provided sample already confirms the following fields are present and extractable:
+The confirmed samples establish the following stable fields across both document variants:
 
 - ISIN
-- execution reference
-- recurring plan reference
+- execution reference (`ESECUZIONE`)
+- secondary reference: `PIANO DI ACCUMULO` in savings plan; `ORDINA` in securities settlement
 - instrument name
-- units
+- units (4–6 decimal places)
 - price per unit
-- gross amount
+- gross amount (first `TOTALE` line)
 - currency
-- execution date
-- value date
+- execution date (`DATA DD.MM.YYYY`)
+- settlement date (ISO `YYYY-MM-DD`, label varies: `DATA VALUTA` vs `DATA DI VALUTA`)
 
-The provided sample also confirms these gaps:
+Field differences between variants:
 
-- ticker is absent
-- fees are not exposed as a separate line item
+- ticker is absent in both samples
+- fees: absent in savings plan; present in securities settlement (`FATTURAZIONE` section, `Supplemento spese di terzi`)
+- the securities settlement variant has two `TOTALE` lines; the first is the gross instrument amount, the second includes the fee and is negative
 
 That suggests the parser contract for this broker should distinguish:
 
@@ -340,14 +353,16 @@ Trade Republic PDFs may use:
 - localized date formats
 - mixed-language metadata and body text
 
-The provided sample confirms:
+Both confirmed samples share:
 
-- metadata title in English: `Savings Plan Execution`
 - body text in Italian
 - decimal comma formatting for quantity and price
-- date format `DD.MM.YYYY` in the document body
+- date format `DD.MM.YYYY` for the transaction date
+- ISO `YYYY-MM-DD` for the settlement date
 
-The parser should normalize all numeric and date values into invariant server-side types and document-kind detection should use both PDF metadata and body keywords instead of one source only.
+Title variants confirmed: `Savings Plan Execution` (sample 1), `Securities Settlement` (sample 2).
+
+The parser must normalize all numeric and date values into invariant server-side types. Document-kind detection must use both PDF title and body keywords. The `Securities Settlement` title dispatches via `ACQUISTO`/`VENDITA` body keywords identically to `Order Confirmation`.
 
 ### 6.4 Scope lock for V1
 
@@ -706,7 +721,11 @@ V1 only processes `BuyConfirmation`, `SellConfirmation`, and `SavingsPlanExecuti
 | `"savings plan execution"` | —                  | `SavingsPlanExecution` |
 | `"order confirmation"`     | `"ACQUISTO"`       | `BuyConfirmation`      |
 | `"order confirmation"`     | `"VENDITA"`        | `SellConfirmation`     |
+| `"securities settlement"`  | `"ACQUISTO"`       | `BuyConfirmation`      |
+| `"securities settlement"`  | `"VENDITA"`        | `SellConfirmation`     |
 | `"dividend"`               | —                  | `Dividend`             |
+
+`Securities Settlement` is confirmed from `test2.pdf` (manual market order, Italian locale). It dispatches via body keywords identically to `Order Confirmation`.
 
 **Step 2 — Body keyword fallback (if title is null or unrecognized):**
 
@@ -739,42 +758,53 @@ All patterns use `Regex.Match` on the full normalized text. Options: `RegexOptio
 
 #### Common to `BuyConfirmation`, `SellConfirmation`, `SavingsPlanExecution`:
 
-> Patterns verified against `test.pdf` (savings plan execution, Italian locale, 2026-03-02).
+> Patterns verified against both `test.pdf` (savings plan execution, Italian locale, 2026-03-02) and `test2.pdf` (securities settlement / manual buy, Italian locale, 2025-12-12).
 
-| Field            | Pattern                                  | Status                                                                           |
-| ---------------- | ---------------------------------------- | -------------------------------------------------------------------------------- |
-| ISIN             | `ISIN:\s*([A-Z]{2}[A-Z0-9]{9}\d)`        | ✓ verified                                                                       |
-| Execution ref    | `ESECUZIONE\s+([A-Za-z0-9\-]+)`          | ✓ verified                                                                       |
-| Plan ref         | `PIANO DI ACCUMULO\s+([A-Za-z0-9\-]+)`   | ✓ verified; savings plan docs only                                               |
-| Gross amount     | `TOTALE\s+([\d,]+)\s+([A-Z]{3})`         | ✓ verified                                                                       |
-| Transaction date | `\bDATA\s+(\d{2}\.\d{2}\.\d{4})`         | ✓ verified; label is `DATA`, **not** `DATA DI ESECUZIONE` or `DATA OPERAZIONE`   |
-| Settlement date  | `DATA VALUTA[\s\S]*?(\d{4}-\d{2}-\d{2})` | ✓ verified; format is ISO `YYYY-MM-DD` across a line break, **not** `DD.MM.YYYY` |
+| Field            | Pattern                                                            | Status / Notes                                                                                                                 |
+| ---------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| ISIN             | `ISIN:\s*([A-Z]{2}[A-Z0-9]{9}\d)`                                  | ✓ both samples                                                                                                                 |
+| Execution ref    | `ESECUZIONE\s*([A-Za-z0-9\-]+)`                                    | ✓ both samples; flattened (no space) in securities settlement                                                                  |
+| Plan ref         | `PIANO DI ACCUMULO\s*([A-Za-z0-9\-]+)`                             | savings plan only; absent in securities settlement                                                                             |
+| Order ref        | `ORDINA\s*([A-Za-z0-9\-]+)`                                        | securities settlement only; captured as `BrokerSecondaryReference`                                                             |
+| Gross amount     | `TOTALE\s*(-?[\d.]*\d,\d+)\s*([A-Z]{3})`                           | ✓ both; first match gives instrument gross; in securities settlement a second negative TOTALE follows — first match is correct |
+| Transaction date | `DATA\s*(\d{2}\.\d{2}\.\d{4})`                                     | ✓ both; `DATA` followed by zero or more spaces then `DD.MM.YYYY`                                                               |
+| Settlement date  | `DATA(?:\s+DI)?\s+VALUTA[\s\S]*?(\d{4}-\d{2}-\d{2})`               | ✓ both; `DI` is present in securities settlement (`DATA DI VALUTA`), absent in savings plan (`DATA VALUTA`)                    |
+| Fee (optional)   | `Supplemento\s+spese\s+di\s+terzi\s*(-?[\d.]*\d,\d+)\s*([A-Z]{3})` | securities settlement only; absent in savings plan; captured as `Fees` (absolute value)                                        |
 
 Notes:
 
-- `\bDATA\s+(\d{2}\.\d{2}\.\d{4})` does **not** accidentally match `DATA VALUTA` because `VALUTA` is not `\d{2}\.\d{2}\.\d{4}`.
-- The settlement date regex uses `[\s\S]*?` (non-greedy, matches the newline between the `DATA VALUTA IMPORTO` header and the IBAN data line).
+- The instrument row header pattern must make `MEDIO` optional: `POSIZIONE\s*QUANTIT[AÀ]\s*PREZZO\s*(?:MEDIO\s*)?IMPORTO`. In savings plan the header is `PREZZO MEDIO IMPORTO`; in securities settlement it is `PREZZO IMPORTO`.
+- The settlement date regex now uses `(?:\s+DI)?` to handle both `DATA VALUTA` (savings plan) and `DATA DI VALUTA` (securities settlement).
+- `DATA\s*(\d{2}\.\d{2}\.\d{4})` does **not** accidentally match `DATA VALUTA` or `DATA DI VALUTA` because `VALUTA` is not `\d{2}\.\d{2}\.\d{4}`.
+- Fee is `null` when no `Supplemento spese di terzi` line is present. When present, store the absolute value.
 
 #### Instrument data row — units, price per unit, and instrument name
 
-`QUANTITÀ` and `PREZZO MEDIO` are **column headers** in the document, not field labels. Their values appear on the instrument data row that immediately follows the header line `POSIZIONE QUANTITÀ PREZZO MEDIO IMPORTO`. Extract all three fields together with one right-anchored pattern (options: `IgnoreCase | Multiline`):
+`QUANTITÀ` and `PREZZO` (optionally `PREZZO MEDIO`) are **column headers** in the document, not field labels. Their values appear on the instrument data row that immediately follows the header.
+
+The header differs by document variant:
+
+- savings plan: `POSIZIONE QUANTITÀ PREZZO MEDIO IMPORTO`
+- securities settlement: `POSIZIONE QUANTITÀ PREZZO IMPORTO` (no `MEDIO`)
+
+`MEDIO` must be made optional in both the structured row pattern and the flattened pattern:
 
 ```
-POSIZIONE QUANTIT[AÀ] PREZZO MEDIO IMPORTO\n(.+?)\s+([\d]+,[\d]+)\s+([\d]+,[\d]+)\s+EUR\s+([\d]+,[\d]+)\s+EUR
+POSIZIONE QUANTIT[AÀ] PREZZO(?:\s+MEDIO)? IMPORTO\n(.+?)\s+([\d]+,[\d]+)\s+([\d]+,[\d]+)\s+EUR\s+([\d]+,[\d]+)\s+EUR
 ```
 
 Capture groups:
 
-| Group | Field                                  | Verified example            |
-| ----- | -------------------------------------- | --------------------------- |
-| 1     | Instrument name                        | `Core MSCI World USD (Acc)` |
-| 2     | Units                                  | `7,378349`                  |
-| 3     | Price per unit                         | `113,8466`                  |
-| 4     | Gross amount (cross-check vs `TOTALE`) | `840,00`                    |
+| Group | Field                                  | test.pdf example            | test2.pdf example                 |
+| ----- | -------------------------------------- | --------------------------- | --------------------------------- |
+| 1     | Instrument name                        | `Core MSCI World USD (Acc)` | `Global Aggregate Bond EUR (Acc)` |
+| 2     | Units                                  | `7,378349`                  | `40,6603`                         |
+| 3     | Price per unit                         | `113,8466`                  | `234,9188`                        |
+| 4     | Gross amount (cross-check vs `TOTALE`) | `840,00`                    | `200,00`                          |
 
-Currency is taken from the fixed `EUR` literals on the same data line; fall back to the `TOTALE` line if absent.
+The flattened fallback pattern (`FlattenedInstrumentPattern`) must also make `MEDIO` optional: `POSIZIONE\s*QUANTIT[AÀ]\s*PREZZO\s*(?:MEDIO\s*)?IMPORTO`.
 
-This replaces the backwards-scan instrument-name approach. The table-row pattern returns the name cleanly as group 1 because all numeric fields are right-anchored at the end of the line.
+Currency is taken from the fixed `EUR` literals on the same data line; fall back to the first `TOTALE` line if absent.
 
 ### 9.10 Field parsing rules
 
@@ -1126,17 +1156,38 @@ Per-file failure must be isolated for:
 
 Add sanitized Trade Republic PDF fixtures and cover:
 
-- buy document
-- sell document
-- savings plan document
-- unsupported document
-- malformed document
-- locale-specific decimals and dates
-- execution date vs value date
-- missing ticker
-- missing explicit fee line
+- savings plan execution (PAC): full parse with `PREZZO MEDIO` header, `PIANO DI ACCUMULO` ref, no fee
+- securities settlement buy: full parse with `PREZZO` header (no `MEDIO`), `ORDINA` ref, fee extracted from `Supplemento spese di terzi`, `DATA DI VALUTA` settlement label
+- securities settlement sell: same layout with `VENDITA` body keyword
+- buy confirmation (`Order Confirmation` title)
+- sell confirmation
+- unsupported document (dividend)
+- malformed document (missing ISIN, missing TOTALE, missing DATA)
+- `Securities Settlement` title dispatched correctly to buy/sell via body keywords
+- fee is `null` when no `Supplemento spese di terzi` line is present
+- fee is extracted correctly when `Supplemento spese di terzi` is present (e.g. `1,00 EUR`)
+- two-TOTALE layout: first match is correct gross amount, second (negative, net with fee) is ignored
+- settlement date parsed correctly for both `DATA VALUTA` and `DATA DI VALUTA` variants
+- `ORDINA` captured as `BrokerSecondaryReference` when `PIANO DI ACCUMULO` is absent
 - mixed-language metadata/body detection
-- 6-decimal fractional quantity handling
+- 4-decimal and 6-decimal fractional quantity handling
+
+**Confirmed fixture values for `test2.pdf` (securities settlement buy):**
+
+| Field                    | Value                             |
+| ------------------------ | --------------------------------- |
+| ISIN                     | `IE00BDBRDM35`                    |
+| Instrument name          | `Global Aggregate Bond EUR (Acc)` |
+| Transaction type         | `BUY`                             |
+| Transaction date         | `2025-12-12`                      |
+| Settlement date          | `2025-12-16`                      |
+| Units                    | `40,6603` → `40.6603`             |
+| Price per unit           | `234,9188` → `234.9188`           |
+| Gross amount             | `200,00` → `200.00`               |
+| Fees                     | `1,00` → `1.00`                   |
+| Currency                 | `EUR`                             |
+| BrokerReference          | `3754-af14`                       |
+| BrokerSecondaryReference | `d74c-69c3`                       |
 
 ### 13.2 Service tests
 
@@ -1241,7 +1292,12 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Add `TradeRepublicParseResult` discriminated union (`Success`, `Unsupported`, `Failure`) to `EtfInsight.Core/DTOs/`
 - [x] Implement `TradeRepublicTextNormalizer` (whitespace, CRLF, zero-width chars)
 - [x] Implement `TradeRepublicDocumentKindDetector` (PDF title + Italian body keywords)
+- [ ] Extend `TradeRepublicDocumentKindDetector` to handle `"Securities Settlement"` title dispatching via `ACQUISTO`/`VENDITA` body keywords
 - [x] Implement `TradeRepublicParser` with regex rule sets for `BuyConfirmation`, `SellConfirmation`, `SavingsPlanExecution`
+- [ ] Update `InstrumentRowPattern` and `FlattenedInstrumentPattern`: make `MEDIO` optional (`PREZZO(?:\s+MEDIO)?`)
+- [ ] Update `SettlementDatePattern`: handle both `DATA VALUTA` and `DATA DI VALUTA` (`DATA(?:\s+DI)?\s+VALUTA`)
+- [ ] Add `OrderRefPattern` for `ORDINA` field: captured as `BrokerSecondaryReference` when `PIANO DI ACCUMULO` is absent
+- [ ] Add fee extraction from `Supplemento spese di terzi` line in FATTURAZIONE section; store absolute value in `Fees`
 - [x] Implement instrument name extraction (backwards-scan from `ISIN:` line)
 - [x] Implement per-field decimal parsing (strip thousands `.`, convert `,` to `.`)
 - [x] Implement per-field date parsing (`dd.MM.yyyy` → `DateOnly`)
@@ -1250,6 +1306,11 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Add `<ProjectReference>` to `EtfInsight.Infrastructure` in the test project
 - [x] Add PDF fixtures to `tests/EtfInsight.Tests/BrokerPdf/Fixtures/` with `CopyToOutputDirectory`
 - [x] Add unit tests: normalizer, detector, parser (all document kinds + failure modes)
+- [ ] Add unit tests for `Securities Settlement` title variant (detector + parser, both buy and sell)
+- [ ] Add unit test: `DATA DI VALUTA` settlement date parsed correctly
+- [ ] Add unit test: `ORDINA` captured as `BrokerSecondaryReference`
+- [ ] Add unit test: fee extracted from `Supplemento spese di terzi` in FATTURAZIONE section
+- [ ] Add unit test: two-TOTALE layout — gross amount is first TOTALE, not second
 
 ### Phase 4 — Instrument resolution and JIT
 

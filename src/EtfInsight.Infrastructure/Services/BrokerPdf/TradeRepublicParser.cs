@@ -19,8 +19,16 @@ namespace EtfInsight.Infrastructure.Services.BrokerPdf
             new(@"PIANO DI ACCUMULO\s*(?<ref>[A-Za-z0-9-]+?)(?=\s*(?:ESECUZIONE|DATA|CONTO TITOLI|PIANO D'INVESTIMENTO|\n|$))",
                 RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
 
+        private static readonly Regex OrderRefPattern =
+            new(@"ORDINA\s*(?<ref>[A-Za-z0-9-]+?)(?=\s*(?:ESECUZIONE|DATA|CONTO TITOLI|POSIZIONE|\n|$))",
+                RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
+
         private static readonly Regex GrossAmountPattern =
             new(@"TOTALE\s*(-?[\d.]*\d,\d+)\s*([A-Z]{3})",
+                RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
+
+        private static readonly Regex FeePattern =
+            new(@"Supplemento\s+spese\s+di\s+terzi\s*(-?[\d.]*\d,\d+)\s*[A-Z]{3}",
                 RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
 
         private static readonly Regex TransactionDatePattern =
@@ -28,15 +36,15 @@ namespace EtfInsight.Infrastructure.Services.BrokerPdf
                 RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
 
         private static readonly Regex SettlementDatePattern =
-            new(@"DATA VALUTA[\s\S]*?(\d{4}-\d{2}-\d{2})",
+            new(@"DATA(?:\s+DI)?\s+VALUTA[\s\S]*?(\d{4}-\d{2}-\d{2})",
                 RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         private static readonly Regex InstrumentRowPattern =
-            new(@"POSIZIONE\s+QUANTIT[AÀ]\s+PREZZO\s+MEDIO\s+IMPORTO\s*\n(?<name>.+?)\s+(?<units>\d[\d.]*,\d+)\s+(?<price>\d[\d.]*,\d+)\s+EUR\s+(?<amount>\d[\d.]*,\d+)\s+EUR",
+            new(@"POSIZIONE\s+QUANTIT[AÀ]\s+PREZZO(?:\s+MEDIO)?\s+IMPORTO\s*\n(?<name>.+?)\s+(?<units>\d[\d.]*,\d+)\s+(?<price>\d[\d.]*,\d+)\s+EUR\s+(?<amount>\d[\d.]*,\d+)\s+EUR",
                 RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
 
         private static readonly Regex FlattenedInstrumentPattern =
-            new(@"POSIZIONE\s*QUANTIT[AÀ]\s*PREZZO\s*MEDIO\s*IMPORTO(?<name>.+?)ISIN:\s*(?<isin>[A-Z]{2}[A-Z0-9]{9}\d)\s*(?<blob>[\d.,\s]+?)\s*EUR\s*(?<amount>-?[\d.]*\d,\d+)\s*(?<currency>[A-Z]{3})",
+            new(@"POSIZIONE\s*QUANTIT[AÀ]\s*PREZZO\s*(?:MEDIO\s*)?IMPORTO(?<name>.+?)ISIN:\s*(?<isin>[A-Z]{2}[A-Z0-9]{9}\d)\s*(?<blob>[\d.,\s]+?)\s*EUR\s*(?<amount>-?[\d.]*\d,\d+)\s*(?<currency>[A-Z]{3})",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
 
         private static readonly Regex WhitespacePattern =
@@ -106,12 +114,19 @@ namespace EtfInsight.Infrastructure.Services.BrokerPdf
             if (settlementMatch.Success && TryParseDate(settlementMatch.Groups[1].Value, "yyyy-MM-dd", out var sd))
                 settlementDate = sd;
 
-            var execMatch = ExecutionRefPattern.Match(normalized);
+            decimal? fees = null;
+            var feeMatch = FeePattern.Match(normalized);
+            if (feeMatch.Success && TryParseDecimal(feeMatch.Groups[1].Value, out var parsedFee))
+                fees = Math.Abs(parsedFee);
 
+            var execMatch = ExecutionRefPattern.Match(normalized);
             var brokerReference = execMatch.Success ? execMatch.Groups["ref"].Value : null;
 
             var planMatch = PlanRefPattern.Match(normalized);
-            var brokerSecondaryReference = planMatch.Success ? planMatch.Groups["ref"].Value : null;
+            var orderMatch = OrderRefPattern.Match(normalized);
+            var brokerSecondaryReference = planMatch.Success
+                ? planMatch.Groups["ref"].Value
+                : orderMatch.Success ? orderMatch.Groups["ref"].Value : null;
 
             var transactionType = kind == TradeRepublicDocumentKind.SellConfirmation ? "SELL" : "BUY";
 
@@ -126,7 +141,7 @@ namespace EtfInsight.Infrastructure.Services.BrokerPdf
                     SettlementDate: settlementDate,
                     Units: units,
                     PricePerUnit: pricePerUnit,
-                    Fees: null, // Fees are not provided in the current document format
+                    Fees: fees,
                     GrossAmount: grossAmount,
                     Currency: currency
                 ));

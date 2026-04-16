@@ -42,6 +42,18 @@ namespace EtfInsight.Infrastructure.Services.BrokerPdf
                     }
                 }
 
+                if (title.Contains("securities settlement", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (normalizedBody.Contains("ACQUISTO", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return TradeRepublicDocumentKind.BuyConfirmation;
+                    }
+                    if (normalizedBody.Contains("VENDITA", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return TradeRepublicDocumentKind.SellConfirmation;
+                    }
+                }
+
                 if (title.Contains("dividend", StringComparison.OrdinalIgnoreCase))
                 {
                     return TradeRepublicDocumentKind.Dividend;
@@ -59,6 +71,5 @@ namespace EtfInsight.Infrastructure.Services.BrokerPdf
 
             return TradeRepublicDocumentKind.Unknown;
         }
-
     }
 }

@@ -79,6 +79,52 @@ public class TradeRepublicParserTests
         "POSIZIONEQUANTITÀPREZZO MEDIOIMPORTOCore MSCI World USD (Acc)ISIN: IE00B4L5Y9837,378349113,8466 EUR840,00 EUR" +
         "TOTALE840,00 EURPRENOTAZIONECONTO DI TRANSITODATA VALUTAIMPORTOIT83A03674016000030792936112026-03-04-840,00 EUR";
 
+    private const string SecuritiesSettlementBuyText =
+        "Securities Settlement\n" +
+        "\n" +
+        "ORDINA d74c-69c3\n" +
+        "ESECUZIONE 3754-af14\n" +
+        "CONTO TITOLI 3079293601\n" +
+        "\n" +
+        "Market-Order Acquisto su 12.12.2025\n" +
+        "\n" +
+        "DATA 12.12.2025\n" +
+        "\n" +
+        "POSIZIONE QUANTITÀ PREZZO IMPORTO\n" +
+        "Global Aggregate Bond EUR (Acc) 40,660323 4,9188 EUR 200,00 EUR\n" +
+        "\n" +
+        "ISIN: IE00BDBRDM35\n" +
+        "\n" +
+        "TOTALE 200,00 EUR\n" +
+        "\n" +
+        "FATTURAZIONE\n" +
+        "POSIZIONE IMPORTO\n" +
+        "Supplemento spese di terzi -1,00 EUR\n" +
+        "TOTALE -201,00 EUR\n" +
+        "\n" +
+        "DATA DI VALUTA IMPORTO\n" +
+        "IT83A0367401600003079293611 2025-12-16 -201,00 EUR";
+
+    private const string SecuritiesSettlementSellText =
+        "Securities Settlement\n" +
+        "\n" +
+        "ORDINA s9k1-2xw8\n" +
+        "ESECUZIONE a8b2-cd34\n" +
+        "CONTO TITOLI 3079293601\n" +
+        "\n" +
+        "Market-Order Vendita su 15.01.2026\n" +
+        "\n" +
+        "DATA 15.01.2026\n" +
+        "\n" +
+        "POSIZIONE QUANTITÀ PREZZO IMPORTO\n" +
+        "Global Aggregate Bond EUR (Acc) 20,330162 4,9188 EUR 100,00 EUR\n" +
+        "\n" +
+        "ISIN: IE00BDBRDM35\n" +
+        "\n" +
+        "TOTALE 100,00 EUR\n" +
+        "\n" +
+        "DATA DI VALUTA IMPORTO\n" +
+        "IT83A0367401600003079293611 2026-01-17 100,00 EUR";
     [Fact]
     public void parses_savings_plan_execution_successfully()
     {
@@ -281,5 +327,73 @@ public class TradeRepublicParserTests
         var result = _parser.Parse(new PdfExtractionResult(null, SavingsPlanText));
 
         Assert.IsType<TradeRepublicParserResult.Success>(result);
+    }
+
+    [Fact]
+    public void parses_securities_settlement_buy_successfully()
+    {
+        var result = _parser.Parse(new PdfExtractionResult("Securities Settlement", SecuritiesSettlementBuyText));
+
+        var success = Assert.IsType<TradeRepublicParserResult.Success>(result);
+        var tx = success.Transaction;
+        Assert.Equal("IE00BDBRDM35", tx.Isin);
+        Assert.Equal("BUY", tx.TransactionType);
+        Assert.Equal(new DateOnly(2025, 12, 12), tx.TransactionDate);
+        Assert.Equal(new DateOnly(2025, 12, 16), tx.SettlementDate);
+        Assert.Equal(40.660323m, tx.Units);
+        Assert.Equal(4.9188m, tx.PricePerUnit);
+        Assert.Equal(200.00m, tx.GrossAmount);
+        Assert.Equal(1.00m, tx.Fees);
+        Assert.Equal("EUR", tx.Currency);
+        Assert.Equal("3754-af14", tx.BrokerReference);
+        Assert.Equal("d74c-69c3", tx.BrokerSecondaryReference);
+        Assert.Equal("Global Aggregate Bond EUR (Acc)", tx.InstrumentName);
+    }
+
+    [Fact]
+    public void parses_securities_settlement_sell_with_sell_transaction_type()
+    {
+        var result = _parser.Parse(new PdfExtractionResult("Securities Settlement", SecuritiesSettlementSellText));
+
+        var success = Assert.IsType<TradeRepublicParserResult.Success>(result);
+        Assert.Equal("SELL", success.Transaction.TransactionType);
+        Assert.Equal("IE00BDBRDM35", success.Transaction.Isin);
+        Assert.Equal(new DateOnly(2026, 1, 15), success.Transaction.TransactionDate);
+    }
+
+    [Fact]
+    public void settlement_date_parsed_with_data_di_valuta_label()
+    {
+        var result = _parser.Parse(new PdfExtractionResult("Securities Settlement", SecuritiesSettlementBuyText));
+
+        var success = Assert.IsType<TradeRepublicParserResult.Success>(result);
+        Assert.Equal(new DateOnly(2025, 12, 16), success.Transaction.SettlementDate);
+    }
+
+    [Fact]
+    public void ordina_captured_as_broker_secondary_reference()
+    {
+        var result = _parser.Parse(new PdfExtractionResult("Securities Settlement", SecuritiesSettlementBuyText));
+
+        var success = Assert.IsType<TradeRepublicParserResult.Success>(result);
+        Assert.Equal("d74c-69c3", success.Transaction.BrokerSecondaryReference);
+    }
+
+    [Fact]
+    public void fee_extracted_from_supplemento_spese_di_terzi()
+    {
+        var result = _parser.Parse(new PdfExtractionResult("Securities Settlement", SecuritiesSettlementBuyText));
+
+        var success = Assert.IsType<TradeRepublicParserResult.Success>(result);
+        Assert.Equal(1.00m, success.Transaction.Fees);
+    }
+
+    [Fact]
+    public void two_totale_layout_uses_first_match_as_gross_amount()
+    {
+        var result = _parser.Parse(new PdfExtractionResult("Securities Settlement", SecuritiesSettlementBuyText));
+
+        var success = Assert.IsType<TradeRepublicParserResult.Success>(result);
+        Assert.Equal(200.00m, success.Transaction.GrossAmount);
     }
 }

@@ -91,5 +91,17 @@ namespace EtfInsight.Tests.BrokerPdf
             var kind = TradeRepublicDocumentKindDetector.Detect("Savings Plan Execution", "ACQUISTO qualcosa");
             Assert.Equal(TradeRepublicDocumentKind.SavingsPlanExecution, kind);
         }
+
+        [Theory]
+        [InlineData("Securities Settlement", "ACQUISTO qualcosa", TradeRepublicDocumentKind.BuyConfirmation)]
+        [InlineData("Securities Settlement", "acquisto qualcosa", TradeRepublicDocumentKind.BuyConfirmation)]
+        [InlineData("Securities Settlement", "VENDITA qualcosa", TradeRepublicDocumentKind.SellConfirmation)]
+        [InlineData("Securities Settlement", "vendita qualcosa", TradeRepublicDocumentKind.SellConfirmation)]
+        public void detects_buy_or_sell_from_securities_settlement_title_and_body(
+            string title, string body, TradeRepublicDocumentKind expected)
+        {
+            var kind = TradeRepublicDocumentKindDetector.Detect(title, body);
+            Assert.Equal(expected, kind);
+        }
     }
 }

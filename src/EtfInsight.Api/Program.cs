@@ -2,6 +2,7 @@ using Npgsql;
 using Dapper;
 using System.Data;
 using EtfInsight.Api.Services;
+using EtfInsight.Infrastructure.TypeHandlers;
 using EtfInsight.Core.Interfaces;
 using EtfInsight.Core.Entities;
 using EtfInsight.Infrastructure.Repositories;
@@ -9,6 +10,7 @@ using EtfInsight.Core.DTOs;
 using EtfInsight.Core.Services;
 using EtfInsight.Core.Configuration;
 using EtfInsight.Infrastructure.Services;
+using EtfInsight.Infrastructure.Services.BrokerPdf;
 using EtfInsight.DataQuality.Models;
 using EtfInsight.DataQuality.Interfaces;
 using EtfInsight.DataQuality.Rules;
@@ -16,8 +18,11 @@ using EtfInsight.DataQuality.Services;
 using Hangfire;
 using Hangfire.PostgreSql;
 using EtfInsight.Api.Filters;
+using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
+
+SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -38,7 +43,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddHttpClient("Ollama");
 builder.Services.AddHttpClient("Airflow");
-
+builder.Services.AddHttpClient("OpenFigi");
 
 // Hangfire configuration
 builder.Services.AddHangfire(config => config
@@ -53,6 +58,7 @@ builder.Services.AddHangfireServer(options =>
 {
     options.WorkerCount = 2;
     options.ServerName = "etf-insight-bgserver";
+    options.Queues = new[] { "broker-imports", "default" };
 });
 
 builder.Services.Configure<AISettings>(builder.Configuration.GetSection("AI"));
@@ -100,6 +106,21 @@ builder.Services.AddScoped<EtfInsight.DataQuality.Interfaces.IEtfPriceRepository
 builder.Services.AddScoped<DataQualityScanner>();
 builder.Services.AddScoped<EtfInsight.Core.Interfaces.IIngestionService, AirflowIngestionService>();
 builder.Services.AddScoped<EtfInsight.Core.Interfaces.ICsvImportService, CsvImportService>();
+builder.Services.AddScoped<IPdfTextExtractor, PdfPigTextExtractor>();
+builder.Services.AddScoped<ITradeRepublicParser, TradeRepublicParser>();
+builder.Services.AddScoped<IBrokerImportRepository, DapperBrokerImportRepository>();
+builder.Services.AddScoped<IBrokerPdfImportService, BrokerPdfImportService>();
+builder.Services.AddScoped<IInstrumentResolutionService, OpenFigInstrumentResolutionService>();
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 1_073_741_824;
+});
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 1_073_741_824;
+});
 
 var app = builder.Build();
 
@@ -116,6 +137,12 @@ RecurringJob.AddOrUpdate<DataQualityScanner>(
     "nightly-data-quality-scan",
     scanner => scanner.ScanRecentPricesAsync(),
     Cron.Daily(2) // Every day at 2:00 AM
+);
+
+RecurringJob.AddOrUpdate<IBrokerPdfImportService>(
+    "cleanup-stale-broker-import-temp-folders",
+    service => service.CleanupStaleTempFoldersAsync(CancellationToken.None),
+    Cron.Daily(3)
 );
 
 // Request logging middleware
@@ -164,4 +191,3 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 
 app.Run();
-

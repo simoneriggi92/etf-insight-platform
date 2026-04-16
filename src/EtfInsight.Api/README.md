@@ -163,3 +163,9 @@ dotnet run
 ### Access Swagger UI
 
 Open browser: `localhost:5076/swagger`
+
+## Debug container
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.debug.yml up --build etf_api
+```

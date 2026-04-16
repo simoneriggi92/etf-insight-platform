@@ -78,6 +78,12 @@ onMounted(() =>{
           class="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent transition-colors">
           📥 Import CSV
         </RouterLink>
+        <RouterLink
+          v-if="store.activeId"
+          :to="`/portfolios/${store.activeId}/import/broker-pdf`"
+          class="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent transition-colors">
+          📄 Import PDFs
+        </RouterLink>
         <button
           class="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent transition-colors"
           @click="showAddTx = !showAddTx">

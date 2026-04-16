@@ -14,6 +14,12 @@ namespace EtfInsight.Core.Interfaces
         /// <param name="ct">Cancellation token</param>
         /// <returns>The ingestion status</returns>
         Task<IngestionStatus> EnsureTickerReadyAsync(string ticker, CancellationToken ct = default);
+
+        Task<IngestionStatus> EnsureTickerReadyAsync(
+            string ticker,
+            string? isin,
+            string? name,
+            CancellationToken ct = default);
     }
 
     public enum IngestionStatus

@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Portfolio, PortfolioDashboardDto, PortfolioSummaryDto } from '../types'
+import type { Portfolio, PortfolioDashboardDto, PortfolioSummaryDto, StartBrokerImportResponse } from '../types'
 
 export interface CreatePortfolioPayload {
   name: string
@@ -51,4 +51,17 @@ export const portfoliosApi = {
     { headers: { 'Content-Type': 'multipart/form-data' }, validateStatus: s => s < 500 }
   )
 },
+  importBrokerPdf: (portfolioId: string, files: File[]) => {
+    const form = new FormData()
+
+    files.forEach(file => {
+      form.append('files', file)
+    })
+
+    return apiClient.post<StartBrokerImportResponse>(
+      `/portfolios/${portfolioId}/import/broker-pdf`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+  },
 }

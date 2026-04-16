@@ -496,6 +496,26 @@ namespace EtfInsight.Tests.Services
             => Task.FromResult(_portfolio is null
                 ? Enumerable.Empty<Portfolio>()
                 : new[] { _portfolio }.AsEnumerable());
+
+        public Task<Portfolio?> GetByIdAndUserAsync(Guid portfolioId, Guid userId, CancellationToken ct = default)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<Portfolio?> GetPortfolioWithTransactionsAsync(Guid id, Guid userId = default)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<IEnumerable<Portfolio>> GetAllPortfoliosWithTransactionsAsync(Guid userId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task BulkAddTransactionsAsync(Guid portfolioId, IEnumerable<Transaction> transactions)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     internal class MockEtfPriceRepository : IEtfPriceRepository

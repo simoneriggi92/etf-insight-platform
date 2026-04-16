@@ -15,6 +15,4 @@ CREATE TABLE etf_documents (
 CREATE INDEX idx_etf_documents_embedding 
     ON etf_documents USING hnsw (embedding vector_cosine_ops);
 
--- Create UNIQUE contraint on ticker
-ALTER TABLE etf_documents ADD CONSTRAINT unique_ticker UNIQUE (ticker);
 

@@ -1,0 +1,39 @@
+# Debug image — not for production use.
+# Builds in Debug configuration so PDBs are present,
+# and installs vsdbg so VS Code can attach remotely.
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+COPY ["EtfInsight.Core/EtfInsight.Core.csproj", "EtfInsight.Core/"]
+COPY ["EtfInsight.DataQuality/EtfInsight.DataQuality.csproj", "EtfInsight.DataQuality/"]
+COPY ["EtfInsight.Infrastructure/EtfInsight.Infrastructure.csproj", "EtfInsight.Infrastructure/"]
+COPY ["EtfInsight.Api/EtfInsight.Api.csproj", "EtfInsight.Api/"]
+
+RUN dotnet restore "EtfInsight.Api/EtfInsight.Api.csproj"
+
+COPY ["EtfInsight.Core/", "EtfInsight.Core/"]
+COPY ["EtfInsight.DataQuality/", "EtfInsight.DataQuality/"]
+COPY ["EtfInsight.Infrastructure/", "EtfInsight.Infrastructure/"]
+COPY ["EtfInsight.Api/", "EtfInsight.Api/"]
+
+WORKDIR /src/EtfInsight.Api
+RUN dotnet publish "EtfInsight.Api.csproj" -c Debug -o /app/publish /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl unzip libgssapi-krb5-2 procps \
+    && curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg \
+    && apt-get remove -y curl unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/publish .
+
+EXPOSE 8080
+
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Development
+
+ENTRYPOINT ["dotnet", "EtfInsight.Api.dll"]

@@ -37,6 +37,11 @@ const router = createRouter({
           name: 'csv-import',
           component: () => import('../views/CsvImportView.vue'),
         },
+        {
+          path: 'portfolios/:id/import/broker-pdf',
+          name: 'broker-pdf-import',
+          component: () => import('../views/BrokerPdfImportView.vue'),
+        },
       ],
     },
   ],

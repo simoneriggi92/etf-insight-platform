@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EtfInsight.Core.DTOs;
+using EtfInsight.Core.DTOs.Summaries;
 using EtfInsight.Core.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -442,6 +443,81 @@ namespace EtfInsight.Infrastructure.Services
             }
 
             return Task.CompletedTask;
+        }
+
+        public async Task<IReadOnlyList<ImportJobSummaryResponse>?> GetJobsByPortfolioIdAsync(Guid portfolioId,
+            Guid userId, CancellationToken ct = default)
+        {
+            var portfolio = await portfolioRepository.GetByIdAndUserAsync(portfolioId, userId, ct);
+
+            if (portfolio is null)
+                return null;
+
+            var jobs = await brokerImportRepository.GetJobsByPortfolioIdAsync(portfolioId, userId, ct);
+
+            var jobSummaries = jobs.Select(j => new ImportJobSummaryResponse(
+                WaitingForIngestionFiles: j.WaitingForIngestionFiles,
+                ProcessedFiles: j.ProcessedFiles
+            )
+            {
+                JobId = j.Id,
+                Broker = j.Broker,
+                Status = j.Status,
+                TotalFiles = j.TotalFiles,
+                ImportedFiles = j.ImportedFiles,
+                DuplicateFiles = j.DuplicateFiles,
+                FailedFiles = j.FailedFiles,
+                ErrorSummary = j.ErrorSummary,
+                CreatedAt = j.CreatedAt,
+                StartedAt = j.StartedAt,
+            }).ToList();
+
+            return jobSummaries;
+        }
+
+        public async Task<ImportJobDetailResponse?> GetJobDetailAsync(Guid jobId, Guid userId, CancellationToken ct = default)
+        {
+            var job = await brokerImportRepository.GetJobAsync(jobId, userId, ct); 
+            
+            if(job is null)
+                return null;
+            
+            var items = await brokerImportRepository.GetItemsAsync(jobId, ct);
+            
+            var itemDetails = items.Select(i => new ImportJobItemDetail(
+                FileName: i.OriginalFileName,
+                Status: i.Status,
+                Isin: i.Isin,
+                InstrumentName: i.InstrumentName,
+                ResolvedTicker: i.ResolvedTicker,
+                TransactionType: i.TransactionType,
+                TransactionDate: i.TransactionDate,
+                SettlementDate: i.SettlementDate,
+                Units: i.Units,
+                PricePerUnit: i.PricePerUnit,
+                Fees: i.Fees,
+                GrossAmount: i.GrossAmount,
+                Currency: i.Currency,
+                BrokerReference: i.BrokerReference,
+                BrokerSecondaryReference: i.BrokerSecondaryReference,
+                ErrorMessage: i.ErrorMessage
+            )).ToList();
+            
+            return new ImportJobDetailResponse(itemDetails)
+            {
+                JobId = job.Id,
+                Broker = job.Broker,
+                Status = job.Status,
+                TotalFiles = job.TotalFiles,
+                ImportedFiles = job.ImportedFiles,
+                DuplicateFiles = job.DuplicateFiles,
+                FailedFiles = job.FailedFiles,
+                ErrorSummary = job.ErrorSummary,
+                CreatedAt = job.CreatedAt,
+                StartedAt = job.StartedAt,
+                CompletedAt = job.CompletedAt,
+                Items = itemDetails
+             };
         }
     }
 }

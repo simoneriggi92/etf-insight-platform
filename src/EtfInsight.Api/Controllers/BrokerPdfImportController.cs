@@ -32,10 +32,12 @@ namespace EtfInsight.Api.Controllers
                 return BadRequest(new { Error = "At least one PDF file is required." });
 
             if (form.Files.Count > MaxFilesPerImport)
-                return BadRequest(new { Error = $"A maximum of {MaxFilesPerImport} files can be uploaded per import." });
+                return BadRequest(new
+                    { Error = $"A maximum of {MaxFilesPerImport} files can be uploaded per import." });
 
             var invalids = form.Files
-                .Where(f => f.Length == 0 || f.Length > MaxFileSizeBytes || !f.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                .Where(f => f.Length == 0 || f.Length > MaxFileSizeBytes ||
+                            !f.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
                 .Select(f => new { f.FileName, Size = f.Length })
                 .ToList();
 
@@ -60,6 +62,36 @@ namespace EtfInsight.Api.Controllers
             return result == null
                 ? NotFound(new { Error = $"Import job {jobId} not found or not owned by you." })
                 : Ok(result);
+        }
+
+        [HttpGet("portfolios/{portfolioId:guid}/import-jobs")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetImportJobsForPortfolio(
+            Guid portfolioId,
+            CancellationToken ct = default)
+        {
+            var userId = HttpContext.GetGuestId();
+            var jobs = importService.GetJobsByPortfolioIdAsync(portfolioId, userId, ct);
+
+            return jobs is null
+                ? NotFound(new { Error = $"Portfolio {portfolioId} not found or not owned by you." })
+                : Ok(jobs);
+        }
+
+        [HttpGet("import-jobs/{jobId:guid}/items")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetImportJobDetail(
+            Guid jobId,
+            CancellationToken ct = default)
+        {
+            var userId = HttpContext.GetGuestId();
+            var detail = await importService.GetJobDetailAsync(jobId, userId, ct);
+
+            return detail is null
+                ? NotFound(new { Error = $"Import job {jobId} not found or not owned by you." })
+                : Ok(detail);
         }
     }
 }

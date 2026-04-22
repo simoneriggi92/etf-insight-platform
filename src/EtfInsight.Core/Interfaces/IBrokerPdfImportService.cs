@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EtfInsight.Core.DTOs;
+using EtfInsight.Core.DTOs.Summaries;
 using Microsoft.AspNetCore.Http;
 
 namespace EtfInsight.Core.Interfaces
@@ -38,6 +39,10 @@ namespace EtfInsight.Core.Interfaces
         /// <param name="ct"></param>
         /// <returns></returns>
         Task CleanupStaleTempFoldersAsync(CancellationToken ct = default);
+        
+        Task<IReadOnlyList<ImportJobSummaryResponse>?> GetJobsByPortfolioIdAsync(Guid portfolioId, Guid userId, CancellationToken ct = default);
+        
+        Task<ImportJobDetailResponse?> GetJobDetailAsync(Guid jobId, Guid userId, CancellationToken ct = default);
 
     }
 }

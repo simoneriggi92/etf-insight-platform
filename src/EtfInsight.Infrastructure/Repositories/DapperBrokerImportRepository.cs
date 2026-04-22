@@ -217,5 +217,36 @@ namespace EtfInsight.Infrastructure.Repositories
                 """,
             new { JobId = jobId, Status = status, CurrentFileName = currentFileName, CurrentMessage = currentMessage });
         }
+        
+        public async Task<IReadOnlyList<BrokerImportJob>> GetJobsByPortfolioIdAsync(Guid portfolioId, Guid userId, CancellationToken ct = default)
+        {
+            var rows = await db.QueryAsync<BrokerImportJob>(
+                                """
+                                SELECT 
+                                    id, portfolio_id AS PortfolioId, 
+                                    user_id AS UserId, 
+                                    broker,
+                                    status,
+                                   hangfire_job_id AS HangfireJobId, 
+                                   total_files AS TotalFiles,
+                                   processed_files AS ProcessedFiles,
+                                   imported_files AS ImportedFiles,
+                                   duplicate_files AS DuplicateFiles,
+                                   failed_files AS FailedFiles,
+                                   waiting_for_ingestion_files AS WaitingForIngestionFiles,
+                                   current_file_name AS CurrentFileName, 
+                                   current_message AS CurrentMessage,
+                                   error_summary AS ErrorSummary, 
+                                   created_at AS CreatedAt,
+                                   started_at AS StartedAt,
+                                   completed_at AS CompletedAt
+                                FROM broker_import_jobs
+                                WHERE portfolio_id = @PortfolioId
+                                  AND user_id = @UserId
+                                ORDER BY created_at DESC
+                                """,
+                                new { PortfolioId = portfolioId, UserId = userId });    
+            return rows.ToList();
+        }
     }
 }

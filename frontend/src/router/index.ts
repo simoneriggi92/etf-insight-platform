@@ -42,6 +42,16 @@ const router = createRouter({
           name: 'broker-pdf-import',
           component: () => import('../views/BrokerPdfImportView.vue'),
         },
+        {
+          path: 'portfolios/:id/import-archive',
+          name: 'broker-import-archive',
+          component: () => import('../views/BrokerImportArchiveView.vue'),
+        },
+        {
+          path: 'portfolios/:id/import-archive/:jobId',
+          name: 'broker-import-job-detail',
+          component: () => import('../views/BrokerImportJobDetailView.vue'),
+        },
       ],
     },
   ],

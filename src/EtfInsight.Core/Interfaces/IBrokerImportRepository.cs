@@ -18,7 +18,6 @@ namespace EtfInsight.Core.Interfaces
         Task<IReadOnlyDictionary<string, string>> GetTickerStatusesForJobAsync(Guid jobId, CancellationToken ct = default);
         Task<bool> IsDocumentAlreadyImportedAsync(Guid portfolioId, string documentHash, string? brokerReference, CancellationToken ct = default);
         Task<Guid> InsertBrokerTransactionAsync(BrokerTransactionInsertRequest request, CancellationToken ct = default);
-        
         Task<IReadOnlyList<BrokerImportJob>> GetJobsByPortfolioIdAsync(Guid portfolioId, Guid userId, CancellationToken ct = default);
     }
 }

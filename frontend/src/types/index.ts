@@ -198,3 +198,55 @@ export interface ImportJobStatusResponse {
   recentItems: ImportJobItemResult[]
   tickerIngestionStatuses: Record<string, string>
 }
+
+// ── Import Archive ────────────────────────────────────────────────────────────
+
+export interface BrokerImportJobSummary {
+  jobId: string
+  broker: string
+  status: BrokerImportJobStatus
+  totalFiles: number
+  processedFiles: number
+  importedFiles: number
+  duplicateFiles: number
+  failedFiles: number
+  waitingForIngestionFiles: number
+  errorSummary: string | null
+  createdAt: string
+  startedAt: string | null
+  completedAt: string | null
+}
+
+export interface BrokerImportItemDetail {
+  fileName: string
+  status: BrokerImportItemStatus
+  isin: string | null
+  instrumentName: string | null
+  resolvedTicker: string | null
+  transactionType: string | null
+  transactionDate: string | null
+  settlementDate: string | null
+  units: number | null
+  pricePerUnit: number | null
+  fees: number | null
+  grossAmount: number | null
+  currency: string | null
+  brokerReference: string | null
+  brokerSecondaryReference: string | null
+  errorMessage: string | null
+}
+
+export interface BrokerImportJobDetail {
+  jobId: string
+  broker: string
+  status: BrokerImportJobStatus
+  totalFiles: number
+  importedFiles: number
+  duplicateFiles: number
+  failedFiles: number
+  errorSummary: string | null
+  createdAt: string
+  startedAt: string | null
+  completedAt: string | null
+  items: BrokerImportItemDetail[]
+}

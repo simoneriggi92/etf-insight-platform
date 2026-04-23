@@ -72,7 +72,7 @@ namespace EtfInsight.Api.Controllers
             CancellationToken ct = default)
         {
             var userId = HttpContext.GetGuestId();
-            var jobs = importService.GetJobsByPortfolioIdAsync(portfolioId, userId, ct);
+            var jobs = await importService.GetJobsByPortfolioIdAsync(portfolioId, userId, ct);
 
             return jobs is null
                 ? NotFound(new { Error = $"Portfolio {portfolioId} not found or not owned by you." })

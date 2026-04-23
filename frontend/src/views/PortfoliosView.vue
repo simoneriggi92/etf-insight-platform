@@ -89,6 +89,12 @@ onMounted(() =>{
           @click="showAddTx = !showAddTx">
           {{ showAddTx ? '✕ Cancel' : '+ Add Transaction' }}
         </button>
+        <RouterLink
+            v-if="store.activeId"
+            :to="`/portfolios/${store.activeId}/import-archive`"
+            class="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-accent transition-colors">
+          🗂 Import Archive
+        </RouterLink>
       </div>
 
       <!-- Add Transaction form (collapsible) -->

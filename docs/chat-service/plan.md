@@ -389,8 +389,8 @@ No changes to existing tables.
 - [x] Phase 1: Database
   - [x] Task 1.1: Create `src/db/10_etf_factsheet_status_schema.sql`
   - [x] Task 1.2: Apply schema to development database
-- [ ] Phase 2: Dependencies
-  - [ ] Task 2.1: Add `duckduckgo-search` and `beautifulsoup4` to `airflow/requirements.txt`
+- [x] Phase 2: Dependencies
+  - [x] Task 2.1: Add `duckduckgo-search` and `beautifulsoup4` to `airflow/requirements.txt`
 - [ ] Phase 3: Retrieval Logic
   - [ ] Task 3.1: Create `airflow/include/transforms/factsheet_retrieval.py` with `retrieve_factsheet`, `_search_duckduckgo`, `_scrape_justetf`, `_download_pdf`
   - [ ] Task 3.2: Add `get_isins_for_factsheet_retrieval` and `upsert_factsheet_status` to `ETFDatabaseHook`

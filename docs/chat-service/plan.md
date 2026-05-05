@@ -386,9 +386,9 @@ No changes to existing tables.
 
 ## Todo List
 
-- [ ] Phase 1: Database
-  - [ ] Task 1.1: Create `src/db/10_etf_factsheet_status_schema.sql`
-  - [ ] Task 1.2: Apply schema to development database
+- [x] Phase 1: Database
+  - [x] Task 1.1: Create `src/db/10_etf_factsheet_status_schema.sql`
+  - [x] Task 1.2: Apply schema to development database
 - [ ] Phase 2: Dependencies
   - [ ] Task 2.1: Add `duckduckgo-search` and `beautifulsoup4` to `airflow/requirements.txt`
 - [ ] Phase 3: Retrieval Logic

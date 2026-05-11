@@ -25,7 +25,7 @@ x-airflow-common: &airflow-common
     BACKFILL_TO: ${BACKFILL_TO:-2026-02-28}
     AIRFLOW__CORE__TEST_CONNECTION: "Enabled"
     AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
-    _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==1.2.0 pandas==2.2.2 pytest==8.2.0"
+    _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==1.2.0 pandas==2.2.2 pytest==8.2.0 duckduckgo-search==7.5.1 beautifulsoup4==4.12.3"
   volumes:
     - ../airflow/dags:/opt/airflow/dags
     - ../airflow/plugins:/opt/airflow/plugins

@@ -98,3 +98,37 @@ class ETFDatabaseHook(PostgresHook):
             parameters=[ticker],
         )
         return rows[0][0] if rows else None
+
+    def get_isins_for_factsheet_retrieval(self) -> list[dict]:
+        rows = self.get_records("""
+            SELECT m.isin, m.ticker, m.name
+            FROM etf_metadata m
+                     LEFT JOIN etf_factsheet_status fs ON fs.isin = m.isin
+            WHERE m.is_active = TRUE
+              AND m.isin IS NOT NULL
+              AND (fs.isin IS NULL OR (fs.status = 'failed' AND fs.attempts < 3))
+            ORDER BY m.ticker
+        """)
+        return [{"isin": r[0], "ticker": r[1], "name": r[2]} for r in rows]
+    
+    def upsert_factsheet_status(self, record:dict) -> None:
+        sql = """
+              INSERT INTO etf_factsheet_status
+              (isin, ticker, status, source, pdf_url, local_path, error, attempts, updated_at)
+              VALUES
+                  (%(isin)s, %(ticker)s, %(status)s, %(source)s, %(pdf_url)s,
+                   %(local_path)s, %(error)s, %(attempts)s, NOW())
+                  ON CONFLICT (isin) DO UPDATE SET
+                  status     = EXCLUDED.status,
+                                            source     = EXCLUDED.source,
+                                            pdf_url    = EXCLUDED.pdf_url,
+                                            local_path = EXCLUDED.local_path,
+                                            error      = EXCLUDED.error,
+                                            attempts   = etf_factsheet_status.attempts + 1,
+                                            updated_at = NOW() \
+              """
+        conn = self.get_conn()
+        cur = conn.cursor()
+        cur.execute(sql, record)
+        conn.commit()
+        cur.close()

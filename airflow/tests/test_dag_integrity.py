@@ -10,8 +10,7 @@ from airflow.models import DagBag
 
 DAG_FOLDER = os.path.join(os.path.dirname(__file__), "..", "dags")
 
-EXPECTED_DAGS = {"etf_daily_prices", "etf_backfill_prices", "data_quality_scan"}
-
+EXPECTED_DAGS = {"etf_daily_prices", "etf_backfill_prices", "data_quality_scan", "etf_knowledge_builder"}
 
 @pytest.fixture(scope="module")
 def dagbag():
@@ -96,3 +95,17 @@ def test_dq_dag_schedule_is_none(dagbag):
     dag = dagbag.dags["data_quality_scan"]
     assert dag.schedule_interval is None
     assert dag.max_active_runs == 3
+
+
+def test_knowledge_builder_dag_task_ids(dagbag):
+    dag = dagbag.dags["etf_knowledge_builder"]
+    task_ids = {t.task_id for t in dag.tasks}
+    assert "get_pending_isins" in task_ids
+    assert "retrieve_factsheets" in task_ids
+
+
+def test_knowledge_builder_schedule(dagbag):
+    dag = dagbag.dags["etf_knowledge_builder"]
+    assert dag.schedule_interval == "0 4 * * 0"
+    assert dag.max_active_runs == 1
+    assert not dag.catchup

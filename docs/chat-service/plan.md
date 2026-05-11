@@ -391,19 +391,27 @@ No changes to existing tables.
   - [x] Task 1.2: Apply schema to development database
 - [x] Phase 2: Dependencies
   - [x] Task 2.1: Add `duckduckgo-search` and `beautifulsoup4` to `airflow/requirements.txt`
-- [ ] Phase 3: Retrieval Logic
-  - [ ] Task 3.1: Create `airflow/include/transforms/factsheet_retrieval.py` with `retrieve_factsheet`, `_search_duckduckgo`, `_scrape_justetf`, `_download_pdf`
-  - [ ] Task 3.2: Add `get_isins_for_factsheet_retrieval` and `upsert_factsheet_status` to `ETFDatabaseHook`
-- [ ] Phase 4: DAG
-  - [ ] Task 4.1: Create `airflow/dags/etf_knowledge_builder.py`
-- [ ] Phase 5: Tests
-  - [ ] Task 5.1: Create `airflow/tests/test_factsheet_retrieval.py` with mocked HTTP tests
-  - [ ] Task 5.2: Update `airflow/tests/test_dag_integrity.py` with `etf_knowledge_builder` expectations
-- [ ] Phase 6: Validation
-  - [ ] Task 6.1: Run DAG integrity tests (`pytest airflow/tests/`)
+- [x] Phase 3: Retrieval Logic
+  - [x] Task 3.1: Create `airflow/include/transforms/factsheet_retrieval.py` with `retrieve_factsheet`, `_search_duckduckgo`, `_scrape_justetf`, `_download_pdf`
+  - [x] Task 3.2: Add `get_isins_for_factsheet_retrieval` and `upsert_factsheet_status` to `ETFDatabaseHook`
+- [x] Phase 4: DAG
+  - [x] Task 4.1: Create `airflow/dags/etf_knowledge_builder.py`
+- [x] Phase 5: Tests
+  - [x] Task 5.1: Create `airflow/tests/test_factsheet_retrieval.py` with mocked HTTP tests
+  - [x] Task 5.2: Update `airflow/tests/test_dag_integrity.py` with `etf_knowledge_builder` expectations
+- [x] Phase 6: Validation
+  - [x] Task 6.1: Run DAG integrity tests (`pytest airflow/tests/`) — 12/12 passed
   - [ ] Task 6.2: Trigger DAG manually in Airflow UI and verify at least one PDF is retrieved
 
 ---
+
+## Deviations
+
+- **Task 4.1 / Task 3.1** — The files as applied contained several defects introduced during the chat-phase drafting cycle (the `new` keyword on a Python instantiation, `from __feature__` instead of `from __future__`, `exists_ok` misspelled as `exists_ok=True` on wrong kwarg, an indentation error in `_scrape_justetf`, `strem=True` typo, and `_success`/`_failure` accidentally nested inside `_download_pdf`). Both files were fully rewritten during Task 6.1 to correct these before the test run passed.
+
+## Observations
+
+- `yfinance`, `duckduckgo-search`, and `beautifulsoup4` are not pre-installed in the base Airflow Docker image used for testing. The test runner requires `pip install` of these packages before the DAG integrity suite can run. This should be baked into the Docker image or a test requirements file for CI. Flagged for future action — out of scope for this plan.
 
 **Do not implement yet.**
 

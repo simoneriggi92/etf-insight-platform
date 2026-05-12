@@ -9,7 +9,7 @@ from airflow.operators.python import PythonOperator
 sys.path.insert(0, "/opt/airflow")
 
 from plugins.hooks.etf_db_hook import ETFDatabaseHook
-from include.transforms.factsheet_retrieval import retrieve_factsheet
+from include.transforms.factsheet_retrieval import inter_isin_sleep, retrieve_factsheet
 
 DEFAULT_ARGS = {
     "owner": "etf-platform",
@@ -53,6 +53,8 @@ def _retrieve_factsheets(**ctx) -> None:
         else:
             failed += 1
             print(f"[retrieve] FAIL {isin} — {result['error']}")
+
+        inter_isin_sleep()
 
     print(f"[retrieve] Done: {downloaded} downloaded, {failed} failed out of {len(isins)}")
 

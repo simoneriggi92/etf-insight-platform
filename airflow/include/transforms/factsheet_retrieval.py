@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import random
 import re
+import time
 
 import requests
 from bs4 import BeautifulSoup
@@ -13,6 +15,15 @@ REQUEST_TIMEOUT = 30
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
+
+DDG_SLEEP_MIN = 3.0
+DDG_SLEEP_MAX = 7.0
+INTER_ISIN_SLEEP_MIN = 4.0
+INTER_ISIN_SLEEP_MAX = 10.0
+
+
+def inter_isin_sleep() -> None:
+    time.sleep(random.uniform(INTER_ISIN_SLEEP_MIN, INTER_ISIN_SLEEP_MAX))
 
 
 def retrieve_factsheet(isin: str, download_dir: str = DOWNLOAD_DIR_DEFAULT) -> dict:
@@ -38,12 +49,13 @@ def _search_duckduckgo(isin: str) -> str | None:
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=5))
+        time.sleep(random.uniform(DDG_SLEEP_MIN, DDG_SLEEP_MAX))
         for r in results:
             href = r.get("href", "")
             if href.lower().endswith(".pdf"):
                 return href
     except Exception:
-        pass
+        time.sleep(random.uniform(DDG_SLEEP_MIN, DDG_SLEEP_MAX))
     return None
 
 

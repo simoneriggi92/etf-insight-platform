@@ -11,7 +11,7 @@ namespace EtfInsight.Core.Configuration
         
         public string EmbeddingModel { get; set; } = "nomic-embed-text";
         
-        public string ChatModel { get; set; } = "llama3.2";\
+        public string ChatModel { get; set; } = "llama3.2";
         
         public int EmbeddingDimensions { get; set; } = 768;
         

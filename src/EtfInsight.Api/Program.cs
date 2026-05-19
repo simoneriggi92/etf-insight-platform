@@ -95,6 +95,8 @@ builder.Services.AddScoped<IEmbeddingGenerator, OllamaEmbeddingService>();
 builder.Services.AddScoped<ISemanticSearchRepository, DapperSemanticSearchRepository>();
 builder.Services.AddScoped<IChatService, OllamaChatService>();
 
+builder.Services.AddHttpContextAccessor();
+
 // Data Quality - Register rules
 builder.Services.AddTransient<IDataQualityRule, NegativePriceRule>();
 builder.Services.AddTransient<IDataQualityRule, FlashCrashRule>();
@@ -172,7 +174,7 @@ app.Use(async (context, next) =>
         throw;
     }
 });
-
+app.UseMiddleware<EtfInsight.Api.Middleware.ApiKeyMiddleware>();
 app.UseMiddleware<EtfInsight.Api.Middleware.GuestSessionMiddleware>();
 app.UseCors(DevCorsPolicy);
 

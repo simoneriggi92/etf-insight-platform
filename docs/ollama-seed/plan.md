@@ -783,23 +783,23 @@ public sealed record SearchResult { public required string Ticker { get; init; }
 
 ## Todo List
 
-- [ ] Phase 1: Schema & Infrastructure
-  - [ ] Task 1.1: Create `src/db/11_etf_documents_multi_chunk.sql` migration script
-  - [ ] Task 1.2: Run migration against local database
-  - [ ] Task 1.3: Add `IngestApiKey`, `MinSimilarityThreshold`, `MaxContextChunks` to `AISettings`
-  - [ ] Task 1.4: Update `appsettings.json` and `appsettings.Development.json`
-  - [ ] Task 1.5: Create `ApiKeyRequiredAttribute`
-  - [ ] Task 1.6: Create `ApiKeyMiddleware`
-  - [ ] Task 1.7: Register middleware and `IHttpContextAccessor` in `Program.cs`
-  - [ ] Task 1.8: Update `docker-compose.yml` with `AI__IngestApiKey` env var
+- [x] Phase 1: Schema & Infrastructure
+  - [x] Task 1.1: Create `src/db/11_etf_documents_multi_chunk.sql` migration script
+  - [x] Task 1.2: Run migration against local database
+  - [x] Task 1.3: Add `IngestApiKey`, `MinSimilarityThreshold`, `MaxContextChunks` to `AISettings`
+  - [x] Task 1.4: Update `appsettings.json` and `appsettings.Development.json`
+  - [x] Task 1.5: Create `ApiKeyRequiredAttribute`
+  - [x] Task 1.6: Create `ApiKeyMiddleware`
+  - [x] Task 1.7: Register middleware and `IHttpContextAccessor` in `Program.cs`
+  - [x] Task 1.8: Update `docker-compose.yml` with `AI__IngestApiKey` env var
 
 - [ ] Phase 2: Core Interface & DTO Changes
-  - [ ] Task 2.1: Convert `SearchResult` to sealed record
-  - [ ] Task 2.2: Create `IngestRequestDto` and `IngestChunkDto`
-  - [ ] Task 2.3: Create `ChatResponseDto` and `SearchResultDto`
-  - [ ] Task 2.4: Add `CancellationToken` to `IEmbeddingGenerator`
-  - [ ] Task 2.5: Add `BulkReplaceAsync`, `CancellationToken`, and `minSimilarity` to `ISemanticSearchRepository`
-  - [ ] Task 2.6: Change `IChatService.AskAiAsync` to return `ChatResponseDto` with `userId` and `CancellationToken`
+  - [x] Task 2.1: Convert `SearchResult` to sealed record
+  - [x] Task 2.2: Create `IngestRequestDto` and `IngestChunkDto`
+  - [x] Task 2.3: Create `ChatResponseDto` and `SearchResultDto`
+  - [x] Task 2.4: Add `CancellationToken` to `IEmbeddingGenerator`
+  - [x] Task 2.5: Add `BulkReplaceAsync`, `CancellationToken`, and `minSimilarity` to `ISemanticSearchRepository`
+  - [x] Task 2.6: Change `IChatService.AskAiAsync` to return `ChatResponseDto` with `userId` and `CancellationToken`
 
 - [ ] Phase 3: Infrastructure Implementations
   - [ ] Task 3.1: Update `OllamaEmbeddingService` to propagate `CancellationToken`

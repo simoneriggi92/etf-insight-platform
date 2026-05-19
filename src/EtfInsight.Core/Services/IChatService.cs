@@ -7,6 +7,6 @@ namespace EtfInsight.Core.Services
 {
     public interface IChatService
     {
-        Task<string> AskAiAsync(string question);
+        Task<string> AskAiAsync(string question, Guid userId, CancellationToken ct = default);
     }
 }

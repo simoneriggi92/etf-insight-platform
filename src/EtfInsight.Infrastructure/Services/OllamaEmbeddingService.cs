@@ -32,7 +32,7 @@ namespace EtfInsight.Infrastructure.Services
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
         }
 
-        public async Task<float[]> GenerateEmbeddingAsync(string input)
+        public async Task<float[]> GenerateEmbeddingAsync(string input, CancellationToken ct = default)
         {
             try
             {

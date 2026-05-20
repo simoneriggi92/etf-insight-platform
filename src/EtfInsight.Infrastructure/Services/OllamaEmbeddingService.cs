@@ -32,7 +32,9 @@ namespace EtfInsight.Infrastructure.Services
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
         }
 
-        public async Task<float[]> GenerateEmbeddingAsync(string input, CancellationToken ct = default)
+        public async Task<float[]> GenerateEmbeddingAsync(
+            string input, 
+            CancellationToken ct = default)
         {
             try
             {
@@ -44,52 +46,79 @@ namespace EtfInsight.Infrastructure.Services
 
                 var jsonOptions = new JsonSerializerOptions
                 {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    PropertyNamingPolicy = JsonNamingPolicy
+                        .CamelCase
                 };
 
-                var json = JsonSerializer.Serialize(request, jsonOptions);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var json = JsonSerializer.Serialize(
+                    request, 
+                    jsonOptions);
+                
+                var content = new StringContent(
+                    json, 
+                    Encoding.UTF8, 
+                    "application/json");
 
-                _logger.LogInformation("Generating embedding using model {Model}", _aiSettings.EmbeddingModel);
+                _logger.LogInformation(
+                    "Generating embedding using model {Model}", 
+                    _aiSettings.EmbeddingModel);
 
-                var response = await _httpClient.PostAsync("/api/embeddings", content);
+                var response = await _httpClient.PostAsync(
+                    "/api/embeddings",
+                    content, 
+                    ct);
+                
                 response.EnsureSuccessStatusCode();
 
-                var jsonResponse = await response.Content.ReadAsStringAsync();
-                var result = JsonSerializer.Deserialize<OllamaEmbeddingResponse>(jsonResponse, jsonOptions);
+                var jsonResponse = await response
+                    .Content
+                    .ReadAsStringAsync(ct);
+                
+                var result = JsonSerializer.Deserialize<OllamaEmbeddingResponse>(
+                    jsonResponse, 
+                    jsonOptions);
 
                 if (result?.Embedding == null || result.Embedding.Length == 0)
                 {
                     throw new InvalidOperationException("Ollama returned empty embedding");
                 }
 
-                _logger.LogInformation("Generated embedding with {Dimensions} dimensions", result.Embedding.Length);
+                _logger.LogInformation(
+                    "Generated embedding with {Dimensions} dimensions", 
+                    result.Embedding.Length);
 
                 return result.Embedding;
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogError(ex, "Failed to connect to Ollama at {Url}. Is Ollama running?",
-              _aiSettings.OllamaUrl);
+                _logger.LogError(
+                    ex, 
+                    "Failed to connect to Ollama at {Url}. Is Ollama running?",
+                    _aiSettings.OllamaUrl);
+                
                 throw new InvalidOperationException(
-                    $"Cannot connect to Ollama at {_aiSettings.OllamaUrl}. Ensure Ollama is running on your host machine.", ex);
+                    $"Cannot connect to Ollama at {_aiSettings.OllamaUrl}. Ensure Ollama is running on your host machine.",
+                    ex);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to generate embedding");
+                _logger.LogError(
+                    ex, 
+                    "Failed to generate embedding");
                 throw;
             }
         }
 
-        public class OllamaEmbeddingResponse
+        public sealed class OllamaEmbeddingResponse
         {
             public float[] Embedding { get; set; } = Array.Empty<float>();
         }
     }
 
-    internal class OllamaEmbeddingRequest
+    internal sealed class OllamaEmbeddingRequest
     {
         public required string Model { get; set; }
+        
         public required string Prompt { get; set; }
     }
 }

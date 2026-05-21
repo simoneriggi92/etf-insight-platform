@@ -793,7 +793,7 @@ public sealed record SearchResult { public required string Ticker { get; init; }
   - [x] Task 1.7: Register middleware and `IHttpContextAccessor` in `Program.cs`
   - [x] Task 1.8: Update `docker-compose.yml` with `AI__IngestApiKey` env var
 
-- [ ] Phase 2: Core Interface & DTO Changes
+- [x] Phase 2: Core Interface & DTO Changes
   - [x] Task 2.1: Convert `SearchResult` to sealed record
   - [x] Task 2.2: Create `IngestRequestDto` and `IngestChunkDto`
   - [x] Task 2.3: Create `ChatResponseDto` and `SearchResultDto`
@@ -801,17 +801,17 @@ public sealed record SearchResult { public required string Ticker { get; init; }
   - [x] Task 2.5: Add `BulkReplaceAsync`, `CancellationToken`, and `minSimilarity` to `ISemanticSearchRepository`
   - [x] Task 2.6: Change `IChatService.AskAiAsync` to return `ChatResponseDto` with `userId` and `CancellationToken`
 
-- [ ] Phase 3: Infrastructure Implementations
-  - [ ] Task 3.1: Update `OllamaEmbeddingService` to propagate `CancellationToken`
-  - [ ] Task 3.2: Implement `BulkReplaceAsync` in `DapperSemanticSearchRepository`
-  - [ ] Task 3.3: Add similarity threshold and `CancellationToken` to `SearchAsync`
-  - [ ] Task 3.4: Refactor `OllamaChatService` — return `ChatResponseDto`, inject portfolio context, fix prompt formatting, propagate `CancellationToken`
+- [x] Phase 3: Infrastructure Implementations
+  - [x] Task 3.1: Update `OllamaEmbeddingService` to propagate `CancellationToken`
+  - [x] Task 3.2: Implement `BulkReplaceAsync` in `DapperSemanticSearchRepository`
+  - [x] Task 3.3: Add similarity threshold and `CancellationToken` to `SearchAsync`
+  - [x] Task 3.4: Refactor `OllamaChatService` — return `ChatResponseDto`, inject portfolio context, fix prompt formatting, propagate `CancellationToken`
 
-- [ ] Phase 4: API Layer
-  - [ ] Task 4.1: Create `IngestController` with `POST /api/search/ingest`
-  - [ ] Task 4.2: Simplify `ChatController` — remove duplicate dependencies, use only `IChatService`
-  - [ ] Task 4.3: Remove `SeedData` endpoint from `SemanticSearchController`
-  - [ ] Task 4.4: Add `CancellationToken` to `SemanticSearchController.Query`
+- [x] Phase 4: API Layer
+  - [x] Task 4.1: Create `IngestController` with `POST /api/search/ingest`
+  - [x] Task 4.2: Simplify `ChatController` — remove duplicate dependencies, use only `IChatService`
+  - [x] Task 4.3: Remove `SeedData` endpoint from `SemanticSearchController`
+  - [x] Task 4.4: Add `CancellationToken` to `SemanticSearchController.Query`
 
 - [ ] Phase 5: Python Airflow Pipeline
   - [ ] Task 5.1: Add `pdfplumber` and `httpx` to `airflow/requirements.txt`

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Dapper;
 using EtfInsight.Core.DTOs;
@@ -24,78 +25,165 @@ namespace EtfInsight.Infrastructure.Repositories
             _logger = logger;
         }
 
-        public async Task SaveEmbeddingAsync(string ticker, string content, float[] embedding)
+        public async Task SaveEmbeddingAsync(
+            string ticker, 
+            string content, 
+            float[] embedding,
+            CancellationToken ct = default)
         {
+            ArgumentNullException.ThrowIfNull(ticker);
+            ArgumentNullException.ThrowIfNull(embedding);
+            
+            _logger.LogInformation(
+                "Saving embedding for ticker {Ticker}",
+                ticker);
+
+            // Use InvariantCulture to ensure decimal points (.) not commas (,)
+            var embeddingString = GetEmbeddingString(embedding);
+
+            var sql = @"
+                INSERT INTO etf_documents (ticker, content, embedding, metadata, is_mandatory, chunk_index, source)
+                VALUES (@Ticker, @Content, @Embedding::vector, @Metadata::jsonb, @IsMandatory, 0, 'manual_seed')
+                ON CONFLICT (ticker, chunk_index) 
+                DO UPDATE SET 
+                    content = EXCLUDED.content,
+                    embedding = EXCLUDED.embedding,
+                    metadata = EXCLUDED.metadata,
+                    created_at = NOW()";
+
+            var parameters = new
+            {
+                Ticker = ticker,
+                Content = content,
+                Embedding = embeddingString,
+                Metadata = "{\"source\": \"manual_seed\", \"version\": \"1.0\"}",
+                IsMandatory = false
+            };
+
+            var cmd = new CommandDefinition(
+                sql, 
+                parameters, 
+                cancellationToken: ct);
+            
+            await _connection.ExecuteAsync(cmd);
+
+            _logger.LogInformation(
+                "Successfully saved embedding for {Ticker}",
+                ticker);
+        }
+
+        public async Task BulkReplaceAsync(
+            string ticker,
+            IReadOnlyList<IngestChunkDto> chunks, 
+            CancellationToken ct = default)
+        {
+            ArgumentNullException.ThrowIfNull(ticker);
+            ArgumentNullException.ThrowIfNull(chunks);
+            
+            if(_connection.State != ConnectionState.Open)
+                _connection.Open();
+            
+            using var transaction = _connection.BeginTransaction();
+
             try
             {
-                _logger.LogInformation("Saving embedding for ticker {Ticker}", ticker);
+                await _connection.ExecuteAsync(
+                    new CommandDefinition(
+                        "DELETE FROM etf_documents WHERE ticker = @Ticker",
+                        new {Ticker = ticker},
+                        transaction,
+                        cancellationToken: ct));
 
-                // Use InvariantCulture to ensure decimal points (.) not commas (,)
-                var embeddingString = $"[{string.Join(",", embedding.Select(f => f.ToString(CultureInfo.InvariantCulture)))}]";
-
-                var sql = @"
-                    INSERT INTO etf_documents (ticker, content, embedding, metadata, is_mandatory)
-                    VALUES (@Ticker, @Content, @Embedding::vector, @Metadata::jsonb, @IsMandatory)
-                    ON CONFLICT (ticker) 
-                    DO UPDATE SET 
-                        content = EXCLUDED.content,
-                        embedding = EXCLUDED.embedding,
-                        metadata = EXCLUDED.metadata,
-                        created_at = NOW()";
-
-                var parameters = new
+                foreach (var chunk in chunks)
                 {
-                    Ticker = ticker,
-                    Content = content,
-                    Embedding = embeddingString,
-                    Metadata = "{\"source\": \"manual_seed\", \"version\": \"1.0\"}",
-                    IsMandatory = false
-                };
+                    var embeddingString = GetEmbeddingString(chunk.Embedding);
+                    var metadataJson = JsonSerializer.Serialize(chunk.Metadata);
+                    var source = chunk.Metadata.GetValueOrDefault("source", "factsheet").ToString();
+                    
+                    const string sql = @"
+                        INSERT INTO etf_documents (ticker, content, embedding, metadata, is_mandatory, chunk_index, source)
+                        VALUES (@Ticker, @Content, @Embedding::vector, @Metadata::jsonb, false, @ChunkIndex, @Source)";
+                    
+                    await _connection.ExecuteAsync(
+                        new CommandDefinition(
+                            sql,
+                            new
+                            {
+                                Ticker = ticker,
+                                Content = chunk.Content,
+                                Embedding = embeddingString,
+                                Metadata = metadataJson,
+                                ChunkIndex = chunk.ChunkIndex,
+                                Source = source
+                            },
+                            transaction,
+                            cancellationToken: ct));
+                }
+                
+                transaction.Commit();
+                
+                _logger.LogInformation(
+                    "Replaced {Count} chunks for {Ticker}", 
+                    chunks.Count, 
+                    ticker);
 
-                await _connection.ExecuteAsync(sql, parameters);
-
-                _logger.LogInformation("Successfully saved embedding for {Ticker}", ticker);
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                _logger.LogError(ex, "Failed to save embedding for ticker {Ticker}", ticker);
+                transaction.Rollback();
                 throw;
             }
         }
 
-        public async Task<IEnumerable<SearchResult>> SearchAsync(float[] queryEmbedding, int limit = 5)
+
+        public async Task<IEnumerable<SearchResult>> SearchAsync(
+            float[] queryEmbedding, 
+            int limit = 5,
+            double minSimilarity = 0.65,
+            CancellationToken ct = default)
         {
-            try
+            ArgumentNullException.ThrowIfNull(queryEmbedding);
+            
+            _logger.LogInformation(
+                "Performing semantic search with limit {Limit}, minSimilarity {MinSimilarity}",
+                limit,
+                minSimilarity);
+            
+            var sql = @"
+                SELECT 
+                    ticker,
+                    content,
+                    1 - (embedding <=> @QueryEmbedding::vector) AS similarity
+                FROM etf_documents
+                WHERE 1 - (embedding <=> @QueryEmbedding::vector) >= @MinSimilarity
+                ORDER BY embedding <=> @QueryEmbedding::vector
+                LIMIT @Limit";
+
+            // Use InvariantCulture to ensure decimal points (.) not commas (,)
+            var parameters = new
             {
-                _logger.LogInformation("Performing semantic search with limit {Limit}", limit);
+                QueryEmbedding = GetEmbeddingString(queryEmbedding),
+                Limit = limit,
+                MinSimilarity = minSimilarity
+            };
 
-                var sql = @"
-                    SELECT 
-                        ticker,
-                        content,
-                        1 - (embedding <=> @QueryEmbedding::vector) AS similarity
-                    FROM etf_documents
-                    ORDER BY embedding <=> @QueryEmbedding::vector
-                    LIMIT @Limit";
+            var cmd = new CommandDefinition(
+                sql, 
+                parameters, 
+                cancellationToken: ct);
+            
+            var results = await _connection
+                .QueryAsync<SearchResult>(cmd);
 
-                // Use InvariantCulture to ensure decimal points (.) not commas (,)
-                var parameters = new
-                {
-                    QueryEmbedding = $"[{string.Join(",", queryEmbedding.Select(f => f.ToString(CultureInfo.InvariantCulture)))}]",
-                    Limit = limit
-                };
+            _logger.LogInformation("Semantic search returned {Count} results", 
+                results.Count());
 
-                var results = await _connection.QueryAsync<SearchResult>(sql, parameters);
+            return results;
+        }
 
-                _logger.LogInformation("Semantic search returned {Count} results", results.Count());
-
-                return results;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to perform semantic search");
-                throw;
-            }
+        private string GetEmbeddingString(float[] embedding)
+        {
+            return $"[{string.Join(",", embedding.Select(f => f.ToString(CultureInfo.InvariantCulture)))}]";
         }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using EtfInsight.Api.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Mvc;
 using EtfInsight.Core.Services;
@@ -16,56 +17,54 @@ namespace EtfInsight.Api.Controllers
     {
         private readonly ILogger<ChatController> _logger;
         private readonly IChatService _chatService;
-        private readonly IEmbeddingGenerator _embeddingGenerator;
-        private readonly ISemanticSearchRepository _semanticSearchRepository;
 
         public ChatController(
             ILogger<ChatController> logger,
-            IChatService chatService,
-            IEmbeddingGenerator embeddingGenerator,
-            ISemanticSearchRepository semanticSearchRepository)
+            IChatService chatService)
         {
             _logger = logger;
             _chatService = chatService;
-            _embeddingGenerator = embeddingGenerator;
-            _semanticSearchRepository = semanticSearchRepository;
         }
 
         /// <summary>
-        /// Endpoint to ask a question to the AI. The system will use RAG to find relevant information from the database and provide an answer along with the sources used.
+        /// Endpoint to ask a question to the AI. T
+        /// he system will use RAG to find relevant information from the database and provide an answer along with the sources used.
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
         [HttpPost]
-        public async Task<IActionResult> Ask([FromBody] ChatRequest request)
+        public async Task<IActionResult> Ask(
+            [FromBody] ChatRequest request,
+            CancellationToken ct)
         {
+            
+            if(string.IsNullOrWhiteSpace(request.Question))
+            {
+                return BadRequest(new { error = "Question cannot be empty" });
+            }
+            
+            _logger.LogInformation("Received question: {Question}", request.Question);
+            
             try
             {
-                if (string.IsNullOrWhiteSpace(request.Question))
-                {
-                    return BadRequest(new { error = "Question cannot be empty" });
-                }
-
-                _logger.LogInformation("Received question: {Question}", request.Question);
-
+                var userId = HttpContext.GetGuestId();
+                
                 // Get AI answer using RAG
-                var answer = await _chatService.AskAiAsync(request.Question);
+                var response = await _chatService.AskAiAsync(
+                    request.Question,
+                    userId,
+                    ct);
 
-                // Also get the sources for transparency
-                var questionEmbedding = await _embeddingGenerator.GenerateEmbeddingAsync(request.Question);
-                var sources = await _semanticSearchRepository.SearchAsync(questionEmbedding, limit: 5);
-
+             
                 return Ok(new
                 {
                     question = request.Question,
-                    answer = answer,
-                    sources = sources.Select(r => new
+                    answer = response.Answer,
+                    sources = response.Sources.Select(s => new
                     {
-                        ticker = r.Ticker,
-                        similarity = Math.Round(r.Similarity, 3),
-                        excerpt = r.Content.Length > 100
-                            ? r.Content.Substring(0, 100) + "..."
-                            : r.Content
+                        ticker = s.Ticker,
+                        similarity = Math.Round(s.Similarity, 3),
+                        excerpt = s.Content.Length > 100 ? s.Content[..100] + "..." : s.Content
                     }),
                     timestamp = DateTime.UtcNow
                 });
@@ -101,7 +100,7 @@ namespace EtfInsight.Api.Controllers
         }
     }
 
-    public class ChatRequest
+    public sealed class ChatRequest
     {
         public string Question { get; set; } = string.Empty;
     }

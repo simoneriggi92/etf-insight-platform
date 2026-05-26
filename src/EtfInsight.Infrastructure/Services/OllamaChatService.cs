@@ -131,7 +131,7 @@ namespace EtfInsight.Infrastructure.Services
         private string BuildAugmentedPrompt(
             string question,
             List<Core.DTOs.SearchResult> relevantDocs,
-            string portfolioContext
+            string? portfolioContext
             )
         {
             var contextBuilder = new StringBuilder();
@@ -227,8 +227,8 @@ namespace EtfInsight.Infrastructure.Services
 
     internal sealed class OllamaGenerateRequest
     {
-        public string Model { get; set; }
-        public string Prompt { get; set; }
+        public required string Model { get; set; }
+        public required string Prompt { get; set; }
         public bool Stream { get; set; }
         public double Temperature { get; set; }
     }

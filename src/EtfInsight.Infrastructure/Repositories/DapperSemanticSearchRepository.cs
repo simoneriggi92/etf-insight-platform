@@ -128,7 +128,7 @@ namespace EtfInsight.Infrastructure.Repositories
                     ticker);
 
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 transaction.Rollback();
                 throw;

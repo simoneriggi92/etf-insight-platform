@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import os
 import sys
 from datetime import datetime, timedelta
 
+import httpx
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 sys.path.insert(0, "/opt/airflow")
 
-from plugins.hooks.etf_db_hook import ETFDatabaseHook
+from include.transforms.factsheet_chunker import process_factsheet
 from include.transforms.factsheet_retrieval import inter_isin_sleep, retrieve_factsheet
+from plugins.hooks.etf_db_hook import ETFDatabaseHook
 
 DEFAULT_ARGS = {
     "owner": "etf-platform",
@@ -19,6 +22,8 @@ DEFAULT_ARGS = {
 }
 
 DOWNLOAD_DIR = "/opt/airflow/data/factsheets"
+DOTNET_API_URL = os.environ.get("DOTNET_API_URL", "http://etf-api:8080")
+INGEST_API_KEY = os.environ.get("INGEST_API_KEY", "")
 
 
 def _get_pending_isins(**ctx) -> list[dict]:
@@ -59,6 +64,42 @@ def _retrieve_factsheets(**ctx) -> None:
     print(f"[retrieve] Done: {downloaded} downloaded, {failed} failed out of {len(isins)}")
 
 
+def _parse_and_embed(**ctx) -> None:
+    hook = ETFDatabaseHook()
+    factsheets = hook.get_downloaded_factsheets()
+
+    if not factsheets:
+        print("[parse_and_embed] No downloaded factsheets to process")
+        return
+
+    print(f"[parse_and_embed] Processing {len(factsheets)} factsheets")
+
+    with httpx.Client(timeout=120.0) as ollama_client:
+        with httpx.Client(
+                base_url=DOTNET_API_URL,
+                headers={"X-API-Key": INGEST_API_KEY},
+                timeout=60.0,
+        ) as api_client:
+            ok_count, fail_count = 0, 0
+            for fs in factsheets:
+                ticker = fs["ticker"]
+                pdf_path = fs["local_path"]
+                try:
+                    chunks = process_factsheet(ticker, pdf_path, ollama_client)
+                    payload = {"ticker": ticker, "chunks": chunks}
+                    resp = api_client.post("/api/search/ingest", json=payload)
+                    resp.raise_for_status()
+                    ok_count += 1
+                    print(f"[parse_and_embed] OK {ticker}: {len(chunks)} chunks ingested")
+                except Exception as e:
+                    fail_count += 1
+                    print(f"[parse_and_embed] FAIL {ticker}: {e}")
+
+    print(f"[parse_and_embed] Done: {ok_count} succeeded, {fail_count} failed out of {len(factsheets)}")
+
+
+
+
 with DAG(
     dag_id="etf_knowledge_builder",
     description="Automated ETF factsheet/KIID PDF retrieval via DuckDuckGo dorking + JustETF fallback",
@@ -80,4 +121,9 @@ with DAG(
         python_callable=_retrieve_factsheets,
     )
 
-    get_pending_isins >> retrieve_factsheets
+    parse_and_embed = PythonOperator(
+        task_id="parse_and_embed",
+        python_callable=_parse_and_embed,
+    )
+
+    get_pending_isins >> retrieve_factsheets >> parse_and_embed

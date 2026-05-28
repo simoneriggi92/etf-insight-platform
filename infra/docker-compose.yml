@@ -27,7 +27,9 @@ x-airflow-common: &airflow-common
     AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
     INGEST_API_KEY: ${AI__INGEST_API_KEY:-dev-ingest-api-key-changeme}
     DOTNET_API_URL: http://etf-api:8080
-    _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==1.2.0 pandas==2.2.2 pytest==8.2.0 duckduckgo-search==7.5.1 beautifulsoup4==4.12.3"
+    FACTSHEET_ENABLE_DDG: ${FACTSHEET_ENABLE_DDG:-false}
+    FACTSHEET_DDG_RATE_LIMIT_COOLDOWN_SECONDS: ${FACTSHEET_DDG_RATE_LIMIT_COOLDOWN_SECONDS:-1800}
+    _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==1.2.0 pandas==2.2.2 pytest==8.2.0 duckduckgo-search==7.5.1 beautifulsoup4==4.12.3 pdfplumber==0.11.9 httpx==0.27.2"
   volumes:
     - ../airflow/dags:/opt/airflow/dags
     - ../airflow/plugins:/opt/airflow/plugins

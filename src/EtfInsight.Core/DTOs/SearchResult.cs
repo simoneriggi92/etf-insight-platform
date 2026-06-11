@@ -1,14 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+namespace EtfInsight.Core.DTOs;
 
-namespace EtfInsight.Core.DTOs
+public sealed record SearchResult
 {
-    public class SearchResult
-    {
-        public string Ticker { get; set; }
-        public string Content { get; set; }
-        public double Similarity { get; set; }
-    }
+    public required string Ticker { get; init; }
+    public required string Content { get; init; }
+    public required double Similarity { get; init; }
 }

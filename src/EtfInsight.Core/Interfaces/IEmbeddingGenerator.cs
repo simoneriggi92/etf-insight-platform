@@ -7,6 +7,6 @@ namespace EtfInsight.Core.Interfaces
 {
     public interface IEmbeddingGenerator
     {
-        Task<float[]> GenerateEmbeddingAsync(string input);
+        Task<float[]> GenerateEmbeddingAsync(string input, CancellationToken ct = default);
     }
 }

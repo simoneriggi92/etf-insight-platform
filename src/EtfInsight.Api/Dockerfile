@@ -30,7 +30,10 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 
 # Install Kerberos libraries to silence Npgsql warnings (optional - warning is harmless)
-RUN apt-get update && apt-get install -y libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
+# and curl for the Docker Compose healthcheck.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/
 
 # Create non-root user for security
 RUN adduser --disabled-password --gecos "" --uid 1000 dotnetuser && \

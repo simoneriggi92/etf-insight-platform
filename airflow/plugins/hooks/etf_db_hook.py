@@ -132,3 +132,13 @@ class ETFDatabaseHook(PostgresHook):
         cur.execute(sql, record)
         conn.commit()
         cur.close()
+
+
+    def get_downloaded_factsheets(self) -> list[dict]:
+        rows = self.get_records("""
+                                SELECT ticker, local_path
+                                FROM etf_factsheet_status
+                                WHERE status = 'downloaded' AND local_path IS NOT NULL
+                                ORDER BY ticker
+                                """)
+        return [{"ticker": r[0], "local_path": r[1]} for r in rows]

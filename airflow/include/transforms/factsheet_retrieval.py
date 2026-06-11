@@ -20,6 +20,12 @@ DDG_SLEEP_MIN = 3.0
 DDG_SLEEP_MAX = 7.0
 INTER_ISIN_SLEEP_MIN = 4.0
 INTER_ISIN_SLEEP_MAX = 10.0
+DDG_ENABLED = os.environ.get("FACTSHEET_ENABLE_DDG", "true").lower() == "true"
+DDG_RATE_LIMIT_COOLDOWN_SECONDS = float(
+    os.environ.get("FACTSHEET_DDG_RATE_LIMIT_COOLDOWN_SECONDS", "1800")
+)
+
+_ddg_rate_limited_until = 0.0
 
 
 def inter_isin_sleep() -> None:
@@ -29,11 +35,12 @@ def inter_isin_sleep() -> None:
 def retrieve_factsheet(isin: str, download_dir: str = DOWNLOAD_DIR_DEFAULT) -> dict:
     os.makedirs(download_dir, exist_ok=True)
 
-    url = _search_duckduckgo(isin)
-    if url:
-        path = _download_pdf(url, isin, download_dir)
-        if path:
-            return _success(source="duckduckgo", pdf_url=url, local_path=path)
+    if _should_use_duckduckgo():
+        url = _search_duckduckgo(isin)
+        if url:
+            path = _download_pdf(url, isin, download_dir)
+            if path:
+                return _success(source="duckduckgo", pdf_url=url, local_path=path)
 
     url = _scrape_justetf(isin)
     if url:
@@ -45,6 +52,8 @@ def retrieve_factsheet(isin: str, download_dir: str = DOWNLOAD_DIR_DEFAULT) -> d
 
 
 def _search_duckduckgo(isin: str) -> str | None:
+    global _ddg_rate_limited_until
+
     query = f'{isin} "factsheet" filetype:pdf'
     try:
         with DDGS() as ddgs:
@@ -54,9 +63,22 @@ def _search_duckduckgo(isin: str) -> str | None:
             href = r.get("href", "")
             if href.lower().endswith(".pdf"):
                 return href
-    except Exception:
+    except Exception as ex:
+        if "ratelimit" in str(ex).lower():
+            _ddg_rate_limited_until = time.time() + DDG_RATE_LIMIT_COOLDOWN_SECONDS
+            print(
+                "[retrieve] DuckDuckGo rate-limited; "
+                f"cooldown for {int(DDG_RATE_LIMIT_COOLDOWN_SECONDS)}s"
+            )
         time.sleep(random.uniform(DDG_SLEEP_MIN, DDG_SLEEP_MAX))
     return None
+
+
+def _should_use_duckduckgo() -> bool:
+    if not DDG_ENABLED:
+        return False
+
+    return time.time() >= _ddg_rate_limited_until
 
 
 def _scrape_justetf(isin: str) -> str | None:

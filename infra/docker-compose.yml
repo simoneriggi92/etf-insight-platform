@@ -25,7 +25,11 @@ x-airflow-common: &airflow-common
     BACKFILL_TO: ${BACKFILL_TO:-2026-02-28}
     AIRFLOW__CORE__TEST_CONNECTION: "Enabled"
     AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
-    _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==1.2.0 pandas==2.2.2 pytest==8.2.0 duckduckgo-search==7.5.1 beautifulsoup4==4.12.3"
+    INGEST_API_KEY: ${AI__INGEST_API_KEY:-dev-ingest-api-key-changeme}
+    DOTNET_API_URL: http://etf-api:8080
+    FACTSHEET_ENABLE_DDG: ${FACTSHEET_ENABLE_DDG:-false}
+    FACTSHEET_DDG_RATE_LIMIT_COOLDOWN_SECONDS: ${FACTSHEET_DDG_RATE_LIMIT_COOLDOWN_SECONDS:-1800}
+    _PIP_ADDITIONAL_REQUIREMENTS: "yfinance==1.2.0 pandas==2.2.2 pytest==8.2.0 duckduckgo-search==7.5.1 beautifulsoup4==4.12.3 pdfplumber==0.11.9 httpx==0.27.2"
   volumes:
     - ../airflow/dags:/opt/airflow/dags
     - ../airflow/plugins:/opt/airflow/plugins
@@ -102,6 +106,7 @@ services:
       - Airflow__Username=${AIRFLOW_USER:-admin}
       - Airflow__Password=${AIRFLOW_PASS:-admin}
       - Airflow__CallbackSecret=${CALLBACK_SECRET:-dev-callback-secret-changeme}
+      - AI__IngestApiKey=${AI__INGEST_API_KEY:-dev-ingest-api-key-changeme}
     depends_on:
       postgres:
         condition: service_healthy

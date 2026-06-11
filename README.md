@@ -197,8 +197,8 @@ When a user submits a transaction for an unknown ticker, the API:
 |            Portfolio creation            |          Transaction Management           |
 | :-----------------------------: | :-------------------------------------: |
 |  ![Portfolio creation](./docs/images/2.1.png)   | ![Import transactions](./docs/v4_images/2.png) |
-| **Transactions & Performance** |          **AirFlow dahboard)** |
-| ![Add Transactions](./docs/images/2.3.png) |![DAGs list](./docs/images/2.0.0.png)          |
+| **Transactions archive** |          **AirFlow dahboard)** |
+| ![Add Transactions](./docs/v4_images/6.png) |![DAGs list](./docs/images/2.0.0.png)          |
 
 ---
 

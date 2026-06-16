@@ -33,6 +33,11 @@ const router = createRouter({
           component: () => import('../views/DataQualityView.vue'),
         },
         {
+          path: 'ai-advisor',
+          name: 'ai-advisor',
+          component: () => import('../views/AiAdvisorView.vue'),
+        },
+        {
           path: 'portfolios/:id/import',
           name: 'csv-import',
           component: () => import('../views/CsvImportView.vue'),

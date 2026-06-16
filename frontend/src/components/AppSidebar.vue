@@ -13,6 +13,7 @@ const navItems = [
   { to: '/portfolios',   label: 'Portfolios',   icon: '📊' },
   { to: '/portfolios/new',  label: 'New Portfolio',  icon: '➕' },
   { to: '/data-quality', label: 'Data Quality', icon: '🛡️' },
+  { to: '/ai-advisor',   label: 'AI Advisor',   icon: '🤖' },
 ]
 
 const isActive = (path: string) =>

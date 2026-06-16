@@ -74,7 +74,7 @@ public class AirflowIngestionService(
             conf = new
             {
                 ticker,
-                date_from = "2015-01-01",
+                date_from = DateTime.UtcNow.AddYears(-3).ToString("yyyy-MM-dd"),
                 date_to = DateTime.UtcNow.ToString("yyyy-MM-dd"),
             }
         };

@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS etf_metadata(
 
 TABLESPACE pg_default;
 
-
 BEGIN;
 
 INSERT INTO etf_metadata
@@ -20,21 +19,21 @@ INSERT INTO etf_metadata
 VALUES
 
 -- ── ETFs ──────────────────────────────────────────────────────────────────────
-('SPY',  'US78462F1030', 'SPDR S&P 500 ETF Trust',                 TRUE, NOW(), NOW()),
-('QQQ',  'US46090E1038', 'Invesco QQQ Trust',                       TRUE, NOW(), NOW()),
-('VTI',  'US9229087690', 'Vanguard Total Stock Market ETF',         TRUE, NOW(), NOW()),
-('VGT',  'US9229087690', 'Vanguard Information Technology ETF',     TRUE, NOW(), NOW()),
-('BND',  'US9219378356', 'Vanguard Total Bond Market ETF',          TRUE, NOW(), NOW()),
-('GLD',  'US78463V1070', 'SPDR Gold Shares',                        TRUE, NOW(), NOW()),
-('SCHD', 'US8085247976', 'Schwab US Dividend Equity ETF',           TRUE, NOW(), NOW()),
-('AGG',  'US4642872422', 'iShares Core US Aggregate Bond ETF',      TRUE, NOW(), NOW()),
+('SPY',  'US78462F1030', 'SPDR S&P 500 ETF Trust',                 FALSE, NOW(), NOW()),
+('QQQ',  'US46090E1038', 'Invesco QQQ Trust',                       FALSE, NOW(), NOW()),
+('VTI',  'US9229087690', 'Vanguard Total Stock Market ETF',         FALSE, NOW(), NOW()),
+('VGT',  'US9229087690', 'Vanguard Information Technology ETF',     FALSE, NOW(), NOW()),
+('BND',  'US9219378356', 'Vanguard Total Bond Market ETF',          FALSE, NOW(), NOW()),
+('GLD',  'US78463V1070', 'SPDR Gold Shares',                        FALSE, NOW(), NOW()),
+('SCHD', 'US8085247976', 'Schwab US Dividend Equity ETF',           FALSE, NOW(), NOW()),
+('AGG',  'US4642872422', 'iShares Core US Aggregate Bond ETF',      FALSE, NOW(), NOW()),
 
 -- ── Equities (used in Growth portfolio) ──────────────────────────────────────
-('MSFT', 'US5949181045', 'Microsoft Corporation',                   TRUE, NOW(), NOW()),
-('NVDA', 'US67066G1040', 'NVIDIA Corporation',                      TRUE, NOW(), NOW()),
-('AAPL', 'US0378331005', 'Apple Inc.',                              TRUE, NOW(), NOW()),
-('SMCI', 'US8621211007', 'Super Micro Computer Inc.',               TRUE, NOW(), NOW()),
-('TSLA', 'US88160R1014', 'Tesla Inc.',                              TRUE, NOW(), NOW())
+('MSFT', 'US5949181045', 'Microsoft Corporation',                   FALSE, NOW(), NOW()),
+('NVDA', 'US67066G1040', 'NVIDIA Corporation',                      FALSE, NOW(), NOW()),
+('AAPL', 'US0378331005', 'Apple Inc.',                              FALSE, NOW(), NOW()),
+('SMCI', 'US8621211007', 'Super Micro Computer Inc.',               FALSE, NOW(), NOW()),
+('TSLA', 'US88160R1014', 'Tesla Inc.',                              FALSE, NOW(), NOW())
 
 ON CONFLICT (ticker) DO NOTHING;
 

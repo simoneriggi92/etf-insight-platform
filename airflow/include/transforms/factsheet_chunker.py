@@ -16,9 +16,9 @@ def extract_text_from_pdf(pdf_path: str) -> str:
 
 
 def sliding_window_chunk(
-        text: str,
-        chunk_size: int = CHUNK_SIZE_CHARS,
-        overlap_fraction: float = OVERLAP_FRACTION,
+    text: str,
+    chunk_size: int = CHUNK_SIZE_CHARS,
+    overlap_fraction: float = OVERLAP_FRACTION,
 ) -> list[str]:
     if not text:
         return []
@@ -36,18 +36,18 @@ def sliding_window_chunk(
 
 def generate_embedding(text: str, client: httpx.Client) -> list[float]:
     resp = client.post(
-        f"{OLLAMA_URL}/api/embeddings",
-        json={"model": EMBEDDING_MODEL, "prompt": text},
+        f"{OLLAMA_URL}/api/embed",
+        json={"model": EMBEDDING_MODEL, "input": text},
         timeout=60.0,
     )
     resp.raise_for_status()
-    return resp.json()["embedding"]
+    return resp.json()["embeddings"][0]
 
 
 def process_factsheet(
-        ticker: str,
-        pdf_path: str,
-        client: httpx.Client,
+    ticker: str,
+    pdf_path: str,
+    client: httpx.Client,
 ) -> list[dict]:
     text = extract_text_from_pdf(pdf_path)
     if not text:

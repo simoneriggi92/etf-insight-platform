@@ -20,9 +20,9 @@ from include.transforms.prices import (
 
 DEFAULT_ARGS = {
     "owner": "etf-platform",
-    "retries": 2,
-    "retry_delay": timedelta(minutes=5),
-    "retry_exponential_backoff": True,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=1),
+    "retry_exponential_backoff": False,
     "email_on_failure": False,
 }
 

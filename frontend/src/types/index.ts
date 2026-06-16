@@ -143,6 +143,10 @@ export interface AiMessage {
   timestamp: string
 }
 
+export interface AiSuggestionsResponse {
+  suggestions: string[]
+}
+
 
 // ── Import Jobs ───────────────────────────────────────────────────────────────
 export type BrokerImportJobStatus =

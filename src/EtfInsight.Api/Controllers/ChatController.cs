@@ -1,12 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using EtfInsight.Api.Extensions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Mvc;
 using EtfInsight.Core.Services;
-using EtfInsight.Core.Interfaces;
 
 namespace EtfInsight.Api.Controllers
 {
@@ -26,36 +26,21 @@ namespace EtfInsight.Api.Controllers
             _chatService = chatService;
         }
 
-        /// <summary>
-        /// Endpoint to ask a question to the AI. T
-        /// he system will use RAG to find relevant information from the database and provide an answer along with the sources used.
-        /// </summary>
-        /// <param name="request"></param>
-        /// <returns></returns>
         [HttpPost]
         public async Task<IActionResult> Ask(
             [FromBody] ChatRequest request,
             CancellationToken ct)
         {
-            
-            if(string.IsNullOrWhiteSpace(request.Question))
-            {
+            if (string.IsNullOrWhiteSpace(request.Question))
                 return BadRequest(new { error = "Question cannot be empty" });
-            }
-            
+
             _logger.LogInformation("Received question: {Question}", request.Question);
-            
+
             try
             {
                 var userId = HttpContext.GetGuestId();
-                
-                // Get AI answer using RAG
-                var response = await _chatService.AskAiAsync(
-                    request.Question,
-                    userId,
-                    ct);
+                var response = await _chatService.AskAiAsync(request.Question, userId, ct);
 
-             
                 return Ok(new
                 {
                     question = request.Question,
@@ -80,9 +65,55 @@ namespace EtfInsight.Api.Controllers
             }
         }
 
-        /// <summary>
-        /// Get suggested questions
-        /// </summary>
+        [HttpPost("stream")]
+        public async Task StreamAsync([FromBody] ChatRequest request, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(request.Question))
+            {
+                Response.StatusCode = StatusCodes.Status400BadRequest;
+                await Response.WriteAsJsonAsync(new { error = "Question cannot be empty" }, ct);
+                return;
+            }
+
+            var userId = HttpContext.GetGuestId();
+
+            Response.ContentType = "text/event-stream";
+            Response.Headers.CacheControl = "no-cache";
+            Response.Headers.Connection = "keep-alive";
+
+            try
+            {
+                var result = await _chatService.AskStreamAsync(request.Question, userId, ct);
+
+                await foreach (var token in result.Tokens)
+                {
+                    var escaped = JsonSerializer.Serialize(token);
+                    await Response.WriteAsync($"data: {escaped}\n\n", ct);
+                    await Response.Body.FlushAsync(ct);
+                }
+
+                var sourcesJson = JsonSerializer.Serialize(result.Sources.Select(s => new
+                {
+                    ticker = s.Ticker,
+                    similarity = Math.Round(s.Similarity, 3),
+                    excerpt = s.Content.Length > 100 ? s.Content[..100] + "..." : s.Content
+                }));
+                await Response.WriteAsync($"event: sources\ndata: {sourcesJson}\n\n", ct);
+                await Response.WriteAsync("data: [DONE]\n\n", ct);
+                await Response.Body.FlushAsync(ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // Client disconnected — normal, no error to log
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Streaming chat failed");
+                await Response.WriteAsync("data: [ERROR]\n\n", ct);
+                await Response.Body.FlushAsync(ct);
+            }
+        }
+
         [HttpGet("suggestions")]
         public IActionResult GetSuggestions()
         {

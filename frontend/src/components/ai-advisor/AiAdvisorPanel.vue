@@ -15,7 +15,7 @@ async function send() {
   const q = input.value.trim()
   if (!q || ai.loading) return
   input.value = ''
-  await ai.send({
+  await ai.sendStreaming({
     question:    q
     // portfolioId: portfolio.activeId ?? undefined,
   })

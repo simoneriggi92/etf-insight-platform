@@ -2,11 +2,9 @@ using System;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using EtfInsight.Core.Configuration;
 using EtfInsight.Core.Interfaces;
-using EtfInsight.Core.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -14,10 +12,8 @@ namespace EtfInsight.Infrastructure.Services
 {
     public class OllamaEmbeddingService : IEmbeddingGenerator
     {
-
         private readonly HttpClient _httpClient;
         private readonly AISettings _aiSettings;
-
         private readonly ILogger<OllamaEmbeddingService> _logger;
 
         public OllamaEmbeddingService(
@@ -33,92 +29,71 @@ namespace EtfInsight.Infrastructure.Services
         }
 
         public async Task<float[]> GenerateEmbeddingAsync(
-            string input, 
+            string input,
             CancellationToken ct = default)
         {
             try
             {
-                var request = new OllamaEmbeddingRequest
+                var request = new OllamaEmbedRequest
                 {
                     Model = _aiSettings.EmbeddingModel,
-                    Prompt = input
+                    Input = input
                 };
 
                 var jsonOptions = new JsonSerializerOptions
                 {
-                    PropertyNamingPolicy = JsonNamingPolicy
-                        .CamelCase
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 };
 
-                var json = JsonSerializer.Serialize(
-                    request, 
-                    jsonOptions);
-                
-                var content = new StringContent(
-                    json, 
-                    Encoding.UTF8, 
-                    "application/json");
+                var json = JsonSerializer.Serialize(request, jsonOptions);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 _logger.LogInformation(
-                    "Generating embedding using model {Model}", 
+                    "Generating embedding using model {Model}",
                     _aiSettings.EmbeddingModel);
 
-                var response = await _httpClient.PostAsync(
-                    "/api/embeddings",
-                    content, 
-                    ct);
-                
+                var response = await _httpClient.PostAsync("/api/embed", content, ct);
                 response.EnsureSuccessStatusCode();
 
-                var jsonResponse = await response
-                    .Content
-                    .ReadAsStringAsync(ct);
-                
-                var result = JsonSerializer.Deserialize<OllamaEmbeddingResponse>(
-                    jsonResponse, 
-                    jsonOptions);
+                var jsonResponse = await response.Content.ReadAsStringAsync(ct);
+                var result = JsonSerializer.Deserialize<OllamaEmbedResponse>(jsonResponse, jsonOptions);
 
-                if (result?.Embedding == null || result.Embedding.Length == 0)
-                {
+                if (result?.Embeddings is not { Length: > 0 } || result.Embeddings[0].Length == 0)
                     throw new InvalidOperationException("Ollama returned empty embedding");
-                }
 
                 _logger.LogInformation(
-                    "Generated embedding with {Dimensions} dimensions", 
-                    result.Embedding.Length);
+                    "Generated embedding with {Dimensions} dimensions",
+                    result.Embeddings[0].Length);
 
-                return result.Embedding;
+                return result.Embeddings[0];
             }
             catch (HttpRequestException ex)
             {
                 _logger.LogError(
-                    ex, 
+                    ex,
                     "Failed to connect to Ollama at {Url}. Is Ollama running?",
                     _aiSettings.OllamaUrl);
-                
+
                 throw new InvalidOperationException(
                     $"Cannot connect to Ollama at {_aiSettings.OllamaUrl}. Ensure Ollama is running on your host machine.",
                     ex);
             }
             catch (Exception ex)
             {
-                _logger.LogError(
-                    ex, 
-                    "Failed to generate embedding");
+                _logger.LogError(ex, "Failed to generate embedding");
                 throw;
             }
         }
-
-        public sealed class OllamaEmbeddingResponse
-        {
-            public float[] Embedding { get; set; } = Array.Empty<float>();
-        }
     }
 
-    internal sealed class OllamaEmbeddingRequest
+    internal sealed class OllamaEmbedRequest
     {
         public required string Model { get; set; }
-        
-        public required string Prompt { get; set; }
+        public required string Input { get; set; }
+    }
+
+    internal sealed class OllamaEmbedResponse
+    {
+        public float[][] Embeddings { get; set; } = Array.Empty<float[]>();
     }
 }

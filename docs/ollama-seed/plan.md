@@ -823,9 +823,9 @@ public sealed record SearchResult { public required string Ticker { get; init; }
 - [ ] Phase 6: Verification
   - [x] Task 6.1: Run `dotnet build` — zero errors
   - [x] Task 6.2: Run existing tests — zero regressions
-  - [ ] Task 6.3: Manual test: POST to `/api/search/ingest` with API key
+  - [x] Task 6.3: Manual test: POST to `/api/search/ingest` with API key
   - [ ] Task 6.4: Manual test: POST to `/api/chat` with a question and verify sources are returned
-  - [ ] Task 6.5: Manual test: Trigger Airflow DAG and verify chunks appear in `etf_documents`
+  - [x] Task 6.5: Manual test: Trigger Airflow DAG and verify chunks appear in `etf_documents`
 
 ---
 

@@ -1,43 +1,73 @@
-# 📈 ETFInsight: AI-Powered Investment Portfolio Manager
+# ETFInsight
 
-> **A modern financial platform combining rigorous performance analytics (TWRR), local AI (RAG), and Just-in-Time price ingestion to provide actionable investment insights.**
+**An AI-powered investment portfolio platform that combines rigorous performance analytics, local RAG, and event-driven data pipelines — all running on your machine.**
 
-![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=flat&logo=dotnet)
-![Vue.js](https://img.shields.io/badge/Vue.js-3.0-4FC08D?style=flat&logo=vuedotjs)
-![Tailwind](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat&logo=tailwind-css)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker)
-![Apache Airflow](https://img.shields.io/badge/Apache%20Airflow-017CEE?style=flat&logo=Apache%20Airflow&logoColor=white)
-![AI](https://img.shields.io/badge/AI-Ollama%20%2B%20RAG-orange?style=flat)
-![Status](https://img.shields.io/badge/Status-V2.0%20Active-brightgreen)
+[![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=flat&logo=dotnet)](https://dotnet.microsoft.com/)
+[![Vue.js](https://img.shields.io/badge/Vue.js-3.0-4FC08D?style=flat&logo=vuedotjs)](https://vuejs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql)](https://www.postgresql.org/)
+[![Apache Airflow](https://img.shields.io/badge/Apache%20Airflow-2.x-017CEE?style=flat&logo=apacheairflow&logoColor=white)](https://airflow.apache.org/)
+[![Docker](https://img.shields.io/badge/Docker%20Compose-ready-2496ED?style=flat&logo=docker)](https://docs.docker.com/compose/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
-## 💡 Overview
+## What is ETFInsight?
 
-**ETFInsight** is not just a portfolio tracker. It is a distributed, event-driven system designed to bridge the gap between **Quantitative Finance** and **Semantic AI**.
+Most portfolio trackers tell you *how much* you have. ETFInsight is designed to tell you *why* your portfolio moves — using a custom analytics engine and a locally-hosted LLM that can answer questions like:
 
-Most portfolio trackers show you *how much* you have. ETFInsight aims to tell you *why* your portfolio is moving, using a custom-built analytics engine and a local LLM to answer questions like:
+> *"Why is my tech exposure risky right now?"*  
+> *"Find me defensive ETFs similar to this one."*
 
-- *"Why is my tech exposure risky right now?"*
-- *"Find me defensive ETFs similar to this one"*
-
-V2.0 introduces:
-
-- **guest-session multi-tenancy**
-- **Just-in-Time (JIT) ticker ingestion**
-- **CSV bulk import**
-- **Airflow-orchestrated data pipelines**
-
-This allows a user to create a portfolio and add transactions for almost any ticker without pre-loading thousands of symbols in advance.
+It is a full-stack, self-hosted platform built on Clean Architecture and Domain-Driven Design. Prices are fetched on demand (no pre-loaded symbol database required), analytics are computed deterministically in .NET, and AI context is injected from pgvector — never hallucinated by the model.
 
 ---
 
-## 🏗️ Architecture
+## Why ETFInsight?
 
-The solution follows **Clean Architecture** and **Domain-Driven Design (DDD)**, runs inside an isolated Docker network, uses **Nginx** as reverse proxy, **Hangfire** for background jobs, and **Apache Airflow** for data engineering workflows.
+- **Local-first AI.** Embeddings and inference run through Ollama on your host. No API keys, no data leaving your machine.
+- **JIT ingestion.** Add a transaction for any ticker. The platform fetches its full price history automatically via Airflow, then notifies the UI when ready.
+- **Correct math.** Time-Weighted Rate of Return (TWRR), daily valuations, PnL, drawdowns — computed server-side, not in the browser.
+- **No sign-up required.** Guest-session multi-tenancy via a browser UUID. Portfolios are isolated without authentication overhead.
+- **Production-grade internals.** Event-driven background jobs (Hangfire), anomaly detection, data quality scanning, and signed Airflow callbacks — not just a CRUD app.
 
-### V2.0 — JIT Ingestion Flow
+---
+
+## Architecture
+
+The system runs entirely inside a Docker network behind an Nginx reverse proxy. Airflow handles all data engineering. The .NET API owns all domain logic and exposes a REST surface to the Vue 3 SPA.
+
+```mermaid
+graph TD
+    Client[Browser] -->|:3000| Nginx[Nginx Reverse Proxy]
+
+    subgraph "Docker Network"
+        Nginx -->|/| Vue[Vue 3 SPA]
+        Nginx -->|/api/*| API[.NET 9 Web API]
+
+        API --> Engine[TWRR Analytics Engine]
+        API --> RAG[Semantic Search + RAG]
+        API --> JIT[JIT Ingestion Service]
+        API --> Hangfire[Hangfire Workers]
+
+        Engine --> DB[(PostgreSQL + pgvector)]
+        Hangfire --> DB
+        RAG --> DB
+        RAG --> Ollama[Ollama — host]
+        JIT --> AirflowWS[Airflow Webserver]
+
+        subgraph "Data Engineering"
+            AirflowWS
+            Scheduler[Scheduler] --> Executor[LocalExecutor]
+            Executor -->|fetch prices| YF[yfinance]
+            Executor -->|POST callback| API
+            YF -->|UPSERT| DB
+        end
+    end
+```
+
+### JIT Ingestion Flow
+
+When a user adds a transaction for an unknown ticker:
 
 ```mermaid
 sequenceDiagram
@@ -45,210 +75,38 @@ sequenceDiagram
     participant Vue as Vue 3 SPA
     participant API as .NET 9 API
     participant DB as PostgreSQL
-    participant AW as Airflow REST API
+    participant AW as Airflow
     participant YF as yfinance
 
-    User->>Vue: Add transaction for unknown ticker
+    User->>Vue: Add transaction (unknown ticker)
     Vue->>API: POST /api/portfolios/{id}/transactions
-    API->>DB: Upsert etf_metadata(status='pending')
+    API->>DB: Upsert etf_metadata (status=pending)
     API->>AW: Trigger etf_backfill_jit DAG
-    API->>DB: Mark ticker as ingesting
     API-->>Vue: 202 Accepted
 
-    Note over Vue: Global ingestion badge appears
+    Note over Vue: Ingestion badge appears
 
     AW->>YF: Fetch historical OHLCV
     YF-->>AW: Price rows
     AW->>DB: UPSERT etf_prices
-    AW->>API: POST /api/ingestion/callback
-    API->>DB: Mark ticker as ready
+    AW->>API: POST /api/ingestion/callback (signed)
+    API->>DB: Mark ticker ready
 
     Vue->>API: Poll /api/ingestion/{ticker}/status
     API-->>Vue: ready
     Vue->>API: Reload analytics
 ```
 
-### System Architecture
-
-```mermaid
-graph TD
-    Client[Browser / User] -->|HTTP :3000| Nginx[Nginx Reverse Proxy]
-
-    subgraph "Docker Network: infra_etf-network"
-        Nginx -->|/| Vue[Vue.js 3 SPA]
-        Nginx -->|/api/*| API[.NET 9 Web API]
-
-        API --> Engine[Portfolio Analytics + TWRR]
-        API --> RAG[AI & Semantic Search]
-        API --> JIT[JIT Ingestion Service]
-        API --> Hangfire[Background Workers]
-
-        Engine --> DB[(PostgreSQL + pgvector)]
-        Hangfire --> DB
-        RAG --> DB
-        RAG --> Ollama[Ollama on Host]
-        JIT --> AirflowWS[Airflow Webserver]
-
-        subgraph "Data Engineering (Airflow)"
-            AirflowWS
-            Scheduler[Airflow Scheduler] --> Executor[LocalExecutor]
-            Executor -->|etf_daily_prices| YF[yfinance]
-            Executor -->|etf_backfill_prices| YF
-            Executor -->|etf_backfill_jit| YF
-            Executor -->|POST callback| API
-            YF -->|UPSERT prices| DB
-        end
-    end
-```
-
 ---
 
-## 🧩 Key Components
+## Quick Start
 
-### Frontend SPA (Vue 3 + TypeScript + Pinia)
-
-- Responsive dashboard styled with Tailwind CSS and shadcn-vue
-- Guest session persisted in `localStorage` and sent via `X-Guest-Id`
-- Global ingestion spinner while any ticker is still loading
-- CSV import UI with preview and per-ticker ingestion statuses
-- AI advisor panel for local RAG queries
-
-### Core API (.NET 9)
-
-| Project                     | Responsibility                                                     |
-| --------------------------- | ------------------------------------------------------------------ |
-| `EtfInsight.Core`           | Entities, DTOs, domain interfaces, analytics services              |
-| `EtfInsight.Infrastructure` | Dapper repositories, Airflow integration, CSV import, Ollama APIs  |
-| `EtfInsight.Api`            | Controllers, middleware, DI wiring, runtime orchestration          |
-| `EtfInsight.DataQuality`    | Anomaly rules, scanner, settings, persistence contracts            |
-
-### Performance Engine
-
-- Time-Weighted Rate of Return (TWRR)
-- Daily valuation history
-- PnL and simple return
-- Peak and drawdown analytics
-
-### JIT Ingestion Pipeline
-
-When a user submits a transaction for an unknown ticker, the API:
-
-1. creates or updates a placeholder row in `etf_metadata`
-2. triggers `etf_backfill_jit` through the Airflow REST API
-3. saves the transaction immediately
-4. returns `202 Accepted`
-5. waits for Airflow to fetch history and POST a signed callback
-6. exposes status through `/api/ingestion/{ticker}/status` until the frontend refreshes analytics
-
-### Multi-Tenancy (Guest Sessions)
-
-- No login required
-- Each browser gets a UUID guest id
-- `GuestSessionMiddleware` resolves and propagates that id
-- `portfolios.user_id` and RLS provide tenant separation for portfolio reads
-
-### CSV Bulk Import
-
-- `multipart/form-data` upload
-- parsed with `CsvHelper`
-- partial-row validation: bad rows are returned, not fatal
-- distinct tickers are pushed through the same JIT flow as manual entry
-
-### AI & Vector Search
-
-- Embeddings generated through Ollama
-- Stored in Postgres with pgvector
-- Similarity search over `etf_documents`
-- Answer generation through local Ollama chat/generate APIs
-
-### Data Quality & Event-Driven Workers
-
-- Hangfire-backed scan scheduling
-- negative-price rule
-- flash-crash rule
-- anomaly persistence in `data_anomalies`
-
-### Data Engineering (Apache Airflow)
-
-| DAG                   | Schedule                | Purpose                                     |
-| --------------------- | ----------------------- | ------------------------------------------- |
-| `etf_daily_prices`    | Daily (EOD)             | Incremental update for active tickers       |
-| `etf_backfill_prices` | Manual                  | Historical backfill for a date range        |
-| `etf_backfill_jit`    | On-demand               | JIT backfill for a single new ticker        |
-| `data_quality_scan`   | Triggered/manual        | Enqueue anomaly scan in the API             |
-
----
-
-## 📸 Screenshots
-
-|            Dashboard            |          Portfolio Management           |
-| :-----------------------------: | :-------------------------------------: |
-|  ![Dashboard](./images/1.png)   | ![Portfolio Management](./images/2.png) |
-| **Transactions & Performance**  |          **AI Advisor (RAG)**           |
-| ![Transactions](./images/3.png) |      ![AI Advisor](./images/4.png)      |
-
-### Data Quality Dashboard
-
-![Data Quality Dashboard](./images/5.png)
-
----
-
-## 🗺️ Roadmap & Progress
-
-### ✅ Phase 1–3: Foundation, Math & AI
-
-- [x] Dockerized local environment
-- [x] TWRR implementation and cash-flow-aware analytics
-- [x] Ollama + pgvector integration
-- [x] Local RAG pipeline
-
-### ✅ Phase 4–6: Trust, Scale & UI
-
-- [x] Audit table for ETF price changes
-- [x] Rule-based anomaly detection
-- [x] Hangfire background jobs
-- [x] Vue 3 + TypeScript SPA
-- [x] Dockerized frontend + API deployment
-
-### ✅ Phase 7: Data Engineering
-
-- [x] Replaced legacy scheduled scripts with Airflow
-- [x] Daily and backfill DAGs with idempotent upserts
-
-### ✅ Phase 8: JIT Ingestion & Guest Sessions
-
-- [x] `user_id` guest-session tenancy model
-- [x] `etf_ingestion_status` lifecycle in `etf_metadata`
-- [x] API-triggered `etf_backfill_jit` DAG
-- [x] Signed ingestion callback endpoint
-- [x] Frontend polling and auto-refresh
-- [x] CSV import integrated with JIT flow
-
-### 🔮 Next Steps
-
-- [ ] Airflow pools and rate-limiting for larger ticker volumes
-- [ ] Automated PDF factsheet/KIID ingestion and embedding
-- [ ] JIT smoke test covering create portfolio → add unknown ticker → poll until ready
-- [ ] Stronger tenant isolation across all data paths
-- [ ] Full multi-currency valuation support
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- **Docker Desktop**
-- **Ollama** running on the host machine
-
-Pull the required models:
+**Prerequisites:** Docker Desktop, [Ollama](https://ollama.com/) running on the host.
 
 ```bash
 ollama pull nomic-embed-text
 ollama pull llama3.2
 ```
-
-### Installation
 
 ```bash
 git clone https://github.com/simoneriggi92/ETFInsight.git
@@ -256,110 +114,186 @@ cd ETFInsight/infra
 docker compose up --build -d
 ```
 
+| Service            | URL                            |
+| ------------------ | ------------------------------ |
+| Web App            | http://localhost:3000          |
+| API / Swagger      | http://localhost:5001          |
+| Airflow            | http://localhost:8090          |
+| Hangfire           | http://localhost:5001/hangfire |
+| Health check       | http://localhost:5001/health   |
+
 ---
 
-## 🔧 Configuration Notes
+## Features
 
-### Ollama
+### Portfolio Analytics
+- Time-Weighted Rate of Return (TWRR) with cash-flow awareness
+- Daily valuation history, PnL, and simple return
+- Peak equity and max drawdown tracking
 
-The API container expects Ollama to be reachable at:
+### AI Advisor (Local RAG)
+- Embeddings stored in PostgreSQL via `pgvector`
+- Semantic search over ETF knowledge documents
+- Ollama-powered chat with deterministic portfolio context injected into the prompt — the LLM never computes financial metrics
 
-```text
+### Just-in-Time Ingestion
+- Add any ticker without pre-loading a symbol database
+- Airflow fetches full OHLCV history and triggers a signed callback
+- Frontend polls status and auto-refreshes analytics when ready
+
+### CSV Bulk Import
+- `multipart/form-data` upload via the UI
+- Parsed with CsvHelper; invalid rows are returned, not fatal
+- Each distinct ticker runs through the same JIT flow as manual entry
+
+### Data Quality
+- Hangfire-scheduled anomaly scans
+- Negative-price and flash-crash detection rules
+- Anomalies persisted in `data_anomalies` for audit
+
+### Data Engineering (Airflow DAGs)
+
+| DAG                     | Schedule         | Purpose                                     |
+| ----------------------- | ---------------- | ------------------------------------------- |
+| `etf_daily_prices`      | Daily (EOD)      | Incremental price update for active tickers |
+| `etf_backfill_prices`   | Manual           | Historical backfill for a date range        |
+| `etf_backfill_jit`      | On-demand        | Single-ticker JIT backfill                  |
+| `etf_knowledge_builder` | Manual/scheduled | Build and embed ETF knowledge documents     |
+| `data_quality_scan`     | Triggered/manual | Enqueue anomaly scan via the API            |
+
+### .NET Solution Layout
+
+| Project                     | Responsibility                                                    |
+| --------------------------- | ----------------------------------------------------------------- |
+| `EtfInsight.Core`           | Entities, DTOs, domain interfaces, analytics services             |
+| `EtfInsight.Infrastructure` | Dapper repositories, Airflow integration, CSV import, Ollama APIs |
+| `EtfInsight.Api`            | Controllers, middleware, DI wiring, runtime orchestration         |
+| `EtfInsight.DataQuality`    | Anomaly rules, scanner, settings, persistence contracts           |
+
+---
+
+## Screenshots
+
+| Dashboard | Portfolio & Performance |
+| :-------: | :---------------------: |
+| ![Dashboard](./images/1.png) | ![Portfolio](./images/3.png) |
+
+| AI Advisor (RAG) | Data Quality |
+| :--------------: | :----------: |
+| ![AI Advisor](./images/4.png) | ![Data Quality](./images/5.png) |
+
+| Portfolio Creation | CSV Import |
+| :----------------: | :--------: |
+| ![Create Portfolio](./images/2.1.png) | ![CSV Import](./images/2.2.png) |
+
+| Add Transaction | Airflow DAGs |
+| :-------------: | :----------: |
+| ![Add Transaction](./images/2.3.png) | ![Airflow](./images/2.0.0.png) |
+
+---
+
+## Roadmap
+
+| Phase | Description | Status |
+| ----- | ----------- | :----: |
+| 1–3 | Foundation, TWRR math, Ollama + pgvector, local RAG | ✅ |
+| 4–6 | Audit table, anomaly detection, Hangfire, Vue 3 SPA | ✅ |
+| 7 | Airflow data pipelines (daily, backfill, JIT DAGs) | ✅ |
+| 8 | JIT ingestion, guest sessions, CSV import | ✅ |
+| 9 | RAG v2 — PDF factsheet chunking, multi-chunk embeddings, portfolio context injection | 🔄 In progress |
+| 10 | Multi-currency valuation | Planned |
+| 11 | Full tenant isolation + authentication | Planned |
+
+---
+
+## Configuration
+
+<details>
+<summary>Ollama host URL</summary>
+
+The API container expects Ollama at:
+
+```
 http://host.docker.internal:11434
 ```
 
-That is already wired in `infra/docker-compose.yml`.
+This is already wired in `infra/docker-compose.yml`. No changes needed for standard Docker Desktop setups.
 
-### Airflow Callback URL
+</details>
 
-There are two common development modes:
+<details>
+<summary>Airflow callback URL (hybrid dev mode)</summary>
 
-#### 1. Full Docker mode
+If you run the .NET API with `dotnet run` on your host while Airflow runs in Docker, the container cannot resolve `etf-api:8080`. Set this variable in your environment or `docker-compose.override.yml`:
 
-API and Airflow both run inside Docker. In this mode, Airflow should callback:
-
-```text
-http://etf-api:8080/api/ingestion/callback
 ```
-
-#### 2. API on host, Airflow in Docker
-
-If you run the API locally with `dotnet run`, Airflow cannot call `etf-api:8080`.  
-In that case, set:
-
-```text
 DOTNET_API_CALLBACK_URL=http://host.docker.internal:5001/api/ingestion/callback
 ```
 
-This is the most important setup detail for local JIT ingestion debugging.
+In full Docker mode (default), leave this unset — the default value resolves correctly inside the network.
 
-### Airflow/Auth variables currently used by the stack
+</details>
 
-| Variable                                  | Service   | Description                                        |
-| ----------------------------------------- | --------- | -------------------------------------------------- |
-| `Airflow__BaseUrl`                        | `etf_api` | Airflow webserver URL used by the API              |
-| `Airflow__Username` / `Airflow__Password` | `etf_api` | Airflow Basic Auth credentials                     |
-| `Airflow__CallbackSecret`                 | `etf_api` | Shared secret expected by `/api/ingestion/callback`|
-| `DOTNET_API_CALLBACK_URL`                 | Airflow   | Callback target for `etf_backfill_jit`             |
-| `AIRFLOW_CALLBACK_SECRET`                 | Airflow   | Shared secret sent by the DAG callback             |
+<details>
+<summary>Environment variables reference</summary>
 
----
+| Variable | Service | Description |
+| -------- | ------- | ----------- |
+| `Airflow__BaseUrl` | `etf_api` | Airflow webserver URL |
+| `Airflow__Username` / `Airflow__Password` | `etf_api` | Airflow Basic Auth |
+| `Airflow__CallbackSecret` | `etf_api` | Shared secret for `/api/ingestion/callback` |
+| `DOTNET_API_CALLBACK_URL` | Airflow | Callback target for `etf_backfill_jit` |
+| `AIRFLOW_CALLBACK_SECRET` | Airflow | Shared secret sent by the DAG |
 
-## 🌐 Access Points
-
-| Service            | URL                                   |
-| ------------------ | ------------------------------------- |
-| Web App            | http://localhost:3000                 |
-| Airflow Dashboard  | http://localhost:8090                 |
-| API Swagger UI     | http://localhost:5001                 |
-| API Health         | http://localhost:5001/health          |
-| Hangfire Dashboard | http://localhost:5001/hangfire        |
-
-Note: Swagger is exposed directly by the API container in development mode. It is not the same as the frontend route space under port `3000`.
+</details>
 
 ---
 
-## 🧪 CSV Import
-
-A sample CSV is available at [`docs/jit ingestion/csv_import/sample_transactions.csv`](./jit%20ingestion/csv_import/sample_transactions.csv).
-
-Expected columns:
+## CSV Format
 
 ```csv
 ticker,transaction_date,type,units,price_per_unit,fees
 VWCE.DE,2024-01-15,BUY,10,98.42,3.95
 ```
 
+A sample file is at [`jit ingestion/csv_import/sample_transactions.csv`](./jit%20ingestion/csv_import/sample_transactions.csv).
+
 ---
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
-### `etf_api` starts but JIT ingestion never completes
+<details>
+<summary>JIT ingestion starts but never completes</summary>
 
-Check:
-
-- `etf-postgres` is healthy
-- `etf-airflow-webserver` is reachable
-- `etf-airflow-scheduler` is running
-- `DOTNET_API_CALLBACK_URL` matches your dev mode
-- `AIRFLOW_CALLBACK_SECRET` matches `Airflow__CallbackSecret`
-
-Useful commands:
+Verify all containers are running and healthy:
 
 ```bash
 docker compose ps
-docker logs etf-api
-docker logs etf-postgres
 docker logs etf-airflow-webserver
 docker logs etf-airflow-scheduler
+docker logs etf-api
 ```
 
-### API works but the container shows as unhealthy
+Check:
+- `DOTNET_API_CALLBACK_URL` points to a reachable API host from inside Docker
+- `AIRFLOW_CALLBACK_SECRET` matches `Airflow__CallbackSecret`
+- Airflow scheduler is not in a `restarting` loop
 
-If the API responds but Docker still marks the container unhealthy, inspect the healthcheck command in `infra/docker-compose.yml` and the runtime image tooling. A mismatched healthcheck can make the container appear unhealthy even when the app process is alive.
+</details>
+
+<details>
+<summary>Container shows unhealthy but API responds</summary>
+
+The Docker healthcheck in `infra/docker-compose.yml` uses `curl` or `wget`. If the runtime image doesn't include the expected tool, the check fails silently while the process runs. Inspect the healthcheck command and verify the tool is available in the container:
+
+```bash
+docker inspect etf-api | jq '.[0].State.Health'
+```
+
+</details>
 
 ---
 
-## 📄 License
+## License
 
 MIT

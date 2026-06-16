@@ -153,13 +153,14 @@ docker compose up --build -d
 
 ### Data Engineering (Airflow DAGs)
 
-| DAG                   | Schedule         | Purpose                                    |
-| --------------------- | ---------------- | ------------------------------------------ |
-| `etf_daily_prices`    | Daily (EOD)      | Incremental price update for active tickers |
-| `etf_backfill_prices` | Manual           | Historical backfill for a date range        |
-| `etf_backfill_jit`    | On-demand        | Single-ticker JIT backfill                  |
-| `etf_knowledge_builder` | Manual / scheduled | Build and embed ETF knowledge documents  |
-| `data_quality_scan`   | Triggered/manual | Enqueue anomaly scan via the API            |
+
+| DAG                     | Schedule         | Purpose                                     |
+| ----------------------- | ---------------- | ------------------------------------------- |
+| `etf_daily_prices`      | Daily (EOD)      | Incremental price update for active tickers |
+| `etf_backfill_prices`   | Manual           | Historical backfill for a date range        |
+| `etf_backfill_jit`      | On-demand        | Single-ticker JIT backfill                  |
+| `etf_knowledge_builder` | Manual/scheduled | Build and embed ETF knowledge documents     |
+| `data_quality_scan`     | Triggered/manual | Enqueue anomaly scan via the API            |
 
 ### .NET Solution Layout
 
@@ -176,19 +177,22 @@ docker compose up --build -d
 
 | Dashboard | Portfolio & Performance |
 | :-------: | :---------------------: |
-| ![Dashboard](./docs/images/1.png) | ![Portfolio](./docs/images/3.png) |
+
+=======
+| ![Dashboard](./docs/images/1.png) | ![Portfolio](./docs/v4_images/4.png) |
 
 | AI Advisor (RAG) | Data Quality |
 | :--------------: | :----------: |
 | ![AI Advisor](./docs/images/4.png) | ![Data Quality](./docs/images/5.png) |
 
-| Portfolio Creation | CSV Import |
+=======
+| Portfolio Creation | TradeRepublic transaction import |
 | :----------------: | :--------: |
-| ![Create Portfolio](./docs/images/2.1.png) | ![CSV Import](./docs/images/2.2.png) |
+| ![Create Portfolio](./docs/images/2.1.png) | ![CSV Import](./docs/v4_images/2.png) |
 
-| Add Transaction | Airflow DAGs |
+| ISIN resolution | Transactions archives |
 | :-------------: | :----------: |
-| ![Add Transaction](./docs/images/2.3.png) | ![Airflow](./docs/images/2.0.0.png) |
+| ![Add Transaction](./docs/v4_images/3.png) | ![Airflow](./docs/v4_images/6.png) |
 
 ---
 
@@ -200,7 +204,9 @@ docker compose up --build -d
 | 4–6 | Audit table, anomaly detection, Hangfire, Vue 3 SPA | ✅ |
 | 7 | Airflow data pipelines (daily, backfill, JIT DAGs) | ✅ |
 | 8 | JIT ingestion, guest sessions, CSV import | ✅ |
-| 9 | RAG v2 — PDF factsheet chunking, multi-chunk embeddings, portfolio context injection | 🔄 In progress |
+
+=======
+| 9 | RAG v2 — PDF factsheet chunking, multi-chunk embeddings, portfolio context injection | ✅|
 | 10 | Multi-currency valuation | Planned |
 | 11 | Full tenant isolation + authentication | Planned |
 
@@ -256,7 +262,8 @@ ticker,transaction_date,type,units,price_per_unit,fees
 VWCE.DE,2024-01-15,BUY,10,98.42,3.95
 ```
 
-A sample file is at [`docs/jit ingestion/csv_import/sample_transactions.csv`](./docs/jit%20ingestion/csv_import/sample_transactions.csv).
+
+A sample file is at [`jit ingestion/csv_import/sample_transactions.csv`](./jit%20ingestion/csv_import/sample_transactions.csv).
 
 ---
 

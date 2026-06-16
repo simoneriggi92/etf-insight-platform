@@ -200,7 +200,7 @@ docker compose up --build -d
 | 4–6 | Audit table, anomaly detection, Hangfire, Vue 3 SPA | ✅ |
 | 7 | Airflow data pipelines (daily, backfill, JIT DAGs) | ✅ |
 | 8 | JIT ingestion, guest sessions, CSV import | ✅ |
-| 9 | RAG v2 — PDF factsheet chunking, multi-chunk embeddings, portfolio context injection | 🔄 In progress |
+| 9 | RAG v2 — PDF factsheet chunking, multi-chunk embeddings, portfolio context injection | ✅|
 | 10 | Multi-currency valuation | Planned |
 | 11 | Full tenant isolation + authentication | Planned |
 
